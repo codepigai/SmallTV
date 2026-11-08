@@ -12,6 +12,16 @@
 
 ---
 
+## 执行进度（2026-11-08 暂停检查点）
+
+- ✅ **Task 1 完成**：脚手架+wrapper，空工程 assembleDebug 通过（`77ca0df` + `.gitattributes` 修复 `ab3483a`）。审查结论：机器专属路径（gradle.properties 的 java.home、wrapper file:// 源）为设计阶段确认的单机构建方案，有意保留。
+- ✅ **Task 2 完成**：资源/完整 Manifest/5 占位 Activity（`a79a245`）；审查修补 `87e6a0d`（landscape 特性可选化、allowBackup=false、PlaybackActivity configChanges——Task 8 注意 manifest 已含 configChanges）。
+- ⏸️ **Task 3（M3uParser TDD）刚开始：仅登记 in_progress，尚未派发实施代理，无半成品代码**。恢复时确认 `git log --oneline -1` 即本检查点提交、`git status` 除 `.claude/` 外干净，然后按计划 Task 3 派发实施代理。
+- 环境要点：PowerShell 5.1 无 `&&`；**gradlew 调用须同行内联** `$env:JAVA_HOME='D:\app\bigtext\tools\jdk17';`；分支 `feature/iptv-player`。
+- 执行方式：子代理驱动（implementer → spec review → quality review，逐任务），Task 4-11 未开始。
+
+---
+
 ## 本机构建环境（重要，所有 gradle 命令都依赖）
 
 | 组件 | 位置 |
