@@ -303,6 +303,7 @@ git commit -m "[build] Gradle 工程脚手架与 wrapper（AGP 8.1.4 / Kotlin 1.
     <uses-permission android:name="android.permission.INTERNET" />
     <uses-feature android:name="android.software.leanback" android:required="false" />
     <uses-feature android:name="android.hardware.touchscreen" android:required="false" />
+    <uses-feature android:name="android.hardware.screen.landscape" android:required="false" />
 
     <application
         android:name=".App"
@@ -311,6 +312,7 @@ git commit -m "[build] Gradle 工程脚手架与 wrapper（AGP 8.1.4 / Kotlin 1.
         android:banner="@drawable/banner"
         android:networkSecurityConfig="@xml/network_security_config"
         android:usesCleartextTraffic="true"
+        android:allowBackup="false"
         android:theme="@style/Theme.IptvTv">
 
         <activity android:name=".ui.HomeActivity" android:exported="true" android:screenOrientation="landscape">
@@ -320,7 +322,8 @@ git commit -m "[build] Gradle 工程脚手架与 wrapper（AGP 8.1.4 / Kotlin 1.
                 <category android:name="android.intent.category.LEANBACK_LAUNCHER" />
             </intent-filter>
         </activity>
-        <activity android:name=".ui.PlaybackActivity" android:screenOrientation="landscape" />
+        <activity android:name=".ui.PlaybackActivity" android:screenOrientation="landscape"
+            android:configChanges="keyboardHidden|screenSize|screenLayout|smallestScreenSize|orientation|navigation" />
         <activity android:name=".ui.EpgActivity" android:screenOrientation="landscape" />
         <activity android:name=".ui.SubsActivity" android:screenOrientation="landscape" />
         <activity android:name=".ui.SubEditActivity" android:screenOrientation="landscape" />
