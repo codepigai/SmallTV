@@ -22,9 +22,10 @@
 - ✅ **Task 6 完成**：Fetcher+Repository（实现 `d0f4d9f`，评审修补 `7dd415c`）。关键契约：`Fetcher` **所有**失败路径只抛 `FetchException`（含响应体读取阶段；`withStream` 限域读取）；错误消息为中文（连接超时/DNS 解析失败/连接失败/服务器错误 $code，可直接进 Toast）；`setCurrentAtomically` 已接入；EPG 写入 `asSequence` 惰性 chunked。**UI（Task 7–10）约定：`catch (e: Exception)` 兜底（解析异常非 FetchException），`e is FetchException -> e.message` 展示原因**。
 - ✅ **Task 7 完成**：首页（实现 `d0bb4ce`，评审修补 `9c08814`，22 测试全绿）。预批准偏差：PlaybackActivity 增 companion 三常量 `EXTRA_NAME/EXTRA_URL/EXTRA_TVG_ID`（Task 8 沿用）；布局无 panelFav，showTab 直接切 `favList.visibility`。质量修补：EPG 后台刷新 15 分钟节流（仅成功记时，失败下次进首页重试）+成功后重绑频道列表；频道/收藏行失焦清空旁存字段（防菜单键操作错误频道）、showTab 重置。真机注意：★/当前节目仅在 reload/重绑时刷新；分组无选中高亮（验收时看是否补）。
 - ✅ **Task 8 完成**：播放页（实现 `bc2b32a`，质量修补 `9e0cb71` + 错误处理重修 `b4fcc65`，22 测试全绿）。预批准偏差：修正 A（`refreshEpg(Subscription)`）、修正 B（EpgActivity 增 companion `EXTRA_NAME/EXTRA_TVG_ID`，Task 9 必须复用这两个常量名与值）、EXTRA_TVG_ID 值保持 `"tvg_id"`。质量修补：onDestroy lateinit 守卫；ctrlFav 按 `repo.isFavorited` 回显（onCreate/restartWith）；lastChannel 每次切台写回；确定/菜单键 repeat 防抖。**首轮 10 秒吞错窗方案被复核否决（会吞首播/新流快速失败），改为监听器随源重建 + URL 快照丢弃旧流迟到错误（b4fcc65），零吞窗**。有意不修（真机验收看）：I2 确定键与控制按钮的框架派发（可点击 TextView 应自动消费 DPAD_CENTER——验收需实测确定键弹/收条与按钮激活均正常）、收起时 playerView.requestFocus 失效（M1）、快速连按切台竞态（M3）、toggleFavorite 无 try/catch 与首页同模式（M4）。
+- ✅ **Task 9 完成**：节目单页（实现 `a1fbedc`，Critical 修复 `b19ed61`，22 测试全绿）。预批准偏差：EpgActivity companion 保持 `EXTRA_TVG_ID="tvg_id"`（Task 8 修正 B 所加，值不采用计划笔误 "tvgId"）；修正 C=设计 §3.3 首页入口补漏——ChannelAdapter 长按→跳 EPG（HomeActivity 仅 +8 行）。质量修补：item_epg 行 `focusable=true` + 数据到达后 `list.post { list.requestFocus() }`（首版整页无可聚焦控件，遥控器无法滚动，Critical）。
 - **环境新增**：本机 fake-IP 系统代理（127.0.0.1:7893），Gradle JVM 不走系统代理导致新依赖解析超时——已在 `gradle.properties` 写入 `systemProp.http(s).proxy*` 4 行（换机器/关代理需删）。另：Write/Edit 工具会把 `"﻿"` 文本转成真实不可见字符，处理 BOM 须用 PowerShell 字节级写入并十六进制验证。
 - 环境要点：PowerShell 5.1 无 `&&`；**gradlew 调用须同行内联** `$env:JAVA_HOME='D:\app\bigtext\tools\jdk17';`（gradle.properties 的 java.home 已含，双保险）；分支 `feature/iptv-player`。
-- 执行方式：子代理驱动（implementer → spec review → quality review，逐任务），当前进行 Task 9。
+- 执行方式：子代理驱动（implementer → spec review → quality review，逐任务），当前进行 Task 10。
 
 ---
 
@@ -2063,6 +2064,12 @@ Expected: `BUILD SUCCESSFUL`。
 git add app/src
 git commit -m "[feat] 节目单页：当日节目列表，高亮正在播出"
 ```
+
+> **实现偏差说明（评审后修订，以代码为准）**：
+> 1. 实际提交消息为「…；首页长按进入」（含修正 C）。
+> 2. 修正 C：设计 §3.3 要求"从播放页/首页进入"，计划原文遗漏首页入口——ChannelAdapter 增 `onLongClick` 参数，频道行长按跳 EpgActivity（HomeActivity 仅 +8 行）。
+> 3. 质量修补（`b19ed61`）：item_epg 根节点 `focusable=true`；协程内 submit/scrollToPosition 后 `list.post { list.requestFocus() }`（post 被同步屏障延至布局完成，行已存在；空表返回 false 无害）。
+> 4. 有意不修（评审 Minor）：长按无防重（连按叠两个实例，BACK 两次退出）；EpgAdapter.now 一次性（久留"正在播出"不翻页）；跨零点节目滚动定位回当日首条——均重进即正确。真机验收：长按在部分 TV 固件依赖按键 repeat，验证手感。
 
 ---
 
