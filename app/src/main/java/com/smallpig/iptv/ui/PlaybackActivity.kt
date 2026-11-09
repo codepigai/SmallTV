@@ -100,8 +100,8 @@ class PlaybackActivity : AppCompatActivity() {
         saveLastChannel()
     }
 
-    override fun onStart() { super.onStart(); player.playWhenReady = true; handler.post(poll); touchBar() }
-    override fun onStop() { super.onStop(); handler.removeCallbacks(poll); player.playWhenReady = false }
+    override fun onStart() { super.onStart(); if (::player.isInitialized) { player.playWhenReady = true; handler.post(poll); touchBar() } }
+    override fun onStop() { super.onStop(); handler.removeCallbacks(poll); if (::player.isInitialized) player.playWhenReady = false }
     override fun onDestroy() {
         super.onDestroy()
         handler.removeCallbacksAndMessages(null)
@@ -204,8 +204,7 @@ class PlaybackActivity : AppCompatActivity() {
             } catch (_: Exception) {}
             try {
                 val (cur, next) = repo.nowNext(chName, chTvgId)
-                if (cur != null || next != null) {
-                    barHasError = false
+                if ((cur != null || next != null) && !barHasError) {
                     nowBar.text = buildString {
                         append(chName)
                         cur?.let { append("　正在：${it.title}") }
