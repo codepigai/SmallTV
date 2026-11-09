@@ -12,4 +12,10 @@ class PlaybackActivity : AppCompatActivity() {
             textSize = 22f; setPadding(48, 48, 48, 48)
         })
     }
+
+    companion object {
+        const val EXTRA_NAME = "name"
+        const val EXTRA_URL = "url"
+        const val EXTRA_TVG_ID = "tvg_id"
+    }
 }

@@ -5,4 +5,18 @@
         <item name="android:textColorPrimary">#FFFFFF</item>
         <item name="android:textColor">#DDDDDD</item>
     </style>
+
+    <style name="TabBtn">
+        <item name="android:layout_width">wrap_content</item>
+        <item name="android:layout_height">wrap_content</item>
+        <item name="android:minWidth">160dp</item>
+        <item name="android:padding">14dp</item>
+        <item name="android:layout_marginEnd">12dp</item>
+        <item name="android:background">@drawable/focus_bg</item>
+        <item name="android:focusable">true</item>
+        <item name="android:clickable">true</item>
+        <item name="android:textSize">18sp</item>
+        <item name="android:textColor">#FFFFFF</item>
+        <item name="android:gravity">center</item>
+    </style>
 </resources>
