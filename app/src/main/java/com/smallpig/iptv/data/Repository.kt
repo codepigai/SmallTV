@@ -37,7 +37,7 @@ class Repository(private val db: AppDatabase, private val fetcher: Fetcher) {
     suspend fun deleteSubscription(sub: Subscription) = withContext(Dispatchers.IO) {
         chans.clearFor(sub.id)
         subs.delete(sub)
-        if (sub.isCurrent) subs.all().firstOrNull()?.let { setSubscriptionCurrent(it.id) }
+        if (sub.isCurrent) subs.all().firstOrNull()?.let { subs.setCurrentAtomically(it.id) }
     }
 
     // ---- 频道 ----
@@ -79,7 +79,7 @@ class Repository(private val db: AppDatabase, private val fetcher: Fetcher) {
 
     suspend fun refreshEpg(sub: Subscription): Int = withContext(Dispatchers.IO) {
         val url = sub.epgUrl ?: return@withContext 0
-        val list = BufferedInputStream(fetcher.stream(url)).use { XmlTvParser.parse(it) }
+        val list = fetcher.withStream(url) { XmlTvParser.parse(BufferedInputStream(it)) }
         epgs.clear()
         list.asSequence().flatMap { p -> p.channelKeys.asSequence().map { k -> EpgProgramme(k, p.title, p.description, p.startMillis, p.stopMillis) } }
             .chunked(500).forEach { epgs.insertAll(it) }
