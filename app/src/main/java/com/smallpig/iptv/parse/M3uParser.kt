@@ -14,8 +14,13 @@ object M3uParser {
         val name: String?, val logo: String?, val group: String?, val tvgId: String?,
     )
 
+    private val reTvgName = Regex("tvg-name=\"([^\"]*)\"")
+    private val reTvgLogo = Regex("tvg-logo=\"([^\"]*)\"")
+    private val reGroupTitle = Regex("group-title=\"([^\"]*)\"")
+    private val reTvgId = Regex("tvg-id=\"([^\"]*)\"")
+
     fun parse(text: String): List<ParsedChannel> {
-        val clean = text.removePrefix("﻿")
+        val clean = text.removePrefix("\uFEFF")
         val out = ArrayList<ParsedChannel>()
         var pending: Pending? = null
         var extGrp: String? = null
@@ -49,22 +54,21 @@ object M3uParser {
 
     private fun parseExtInf(line: String): Pending? {
         val comma = line.indexOf(',')
-        val attrs: String; val name: String
-        if (comma < 0) { attrs = line; name = "" } else { attrs = line.substring(0, comma); name = line.substring(comma + 1).trim() }
+        val attrs: String; val dispName: String
+        if (comma < 0) { attrs = line; dispName = "" } else { attrs = line.substring(0, comma); dispName = line.substring(comma + 1).trim() }
         return Pending(
-            name = name.ifBlank { null },
-            logo = attr(attrs, "tvg-logo")?.ifBlank { null },
-            group = attr(attrs, "group-title")?.ifBlank { null },
-            tvgId = attr(attrs, "tvg-id"),
+            name = dispName.ifBlank { attr(attrs, reTvgName) ?: "" }.ifBlank { null },
+            logo = attr(attrs, reTvgLogo)?.ifBlank { null },
+            group = attr(attrs, reGroupTitle)?.ifBlank { null },
+            tvgId = attr(attrs, reTvgId)?.ifBlank { null },
         )
     }
 
-    private fun attr(attrs: String, key: String): String? =
-        Regex("$key=\"([^\"]*)\"").find(attrs)?.groupValues?.get(1)
+    private fun attr(attrs: String, re: Regex): String? = re.find(attrs)?.groupValues?.get(1)
 
     private fun splitNameUrl(line: String, pendingName: String?): Pair<String, String>? {
         val ci = line.indexOf(',')
-        if (ci > 0) {
+        if (ci >= 0) {
             val u = line.substring(ci + 1).trim()
             if (isUrl(u) && !u.contains(' ')) return line.substring(0, ci).trim() to u
         }

@@ -54,9 +54,25 @@ class M3uParserTest {
     }
 
     @Test fun bomCrlfAndBlankLines() {
-        val text = "﻿" + "#EXTM3U\r\n\r\n#EXTINF:-1 tvg-logo=\"\",A\r\nhttp://a\r\n\r\n"
+        val text = "\uFEFF" + "#EXTM3U\r\n\r\n#EXTINF:-1 tvg-logo=\"\",A\r\nhttp://a\r\n\r\n"
         val r = M3uParser.parse(text)
         assertEquals(1, r.size); assertEquals("A", r[0].name)
         assertEquals(null, r[0].logo)
+    }
+
+    @Test fun emptyNameCommaUrl() {
+        val r = M3uParser.parse(",http://host/cctv1.m3u8\n")
+        assertEquals(1, r.size)
+        assertEquals("cctv1.m3u8", r[0].name)
+        assertEquals("http://host/cctv1.m3u8", r[0].url)
+    }
+
+    @Test fun tvgNameUsedWhenDisplayNameEmpty() {
+        val text = "#EXTINF:-1 tvg-name=\"CCTV综合\",\nhttp://h/1.ts\n" +
+            "#EXTINF:-1 tvg-name=\"被忽略\",显示名优先\nhttp://h/2.ts\n"
+        val r = M3uParser.parse(text)
+        assertEquals(2, r.size)
+        assertEquals("CCTV综合", r[0].name)
+        assertEquals("显示名优先", r[1].name)
     }
 }
