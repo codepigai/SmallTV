@@ -12,13 +12,14 @@
 
 ---
 
-## 执行进度（2026-11-08 暂停检查点）
+## 执行进度（持续更新）
 
 - ✅ **Task 1 完成**：脚手架+wrapper，空工程 assembleDebug 通过（`77ca0df` + `.gitattributes` 修复 `ab3483a`）。审查结论：机器专属路径（gradle.properties 的 java.home、wrapper file:// 源）为设计阶段确认的单机构建方案，有意保留。
 - ✅ **Task 2 完成**：资源/完整 Manifest/5 占位 Activity（`a79a245`）；审查修补 `87e6a0d`（landscape 特性可选化、allowBackup=false、PlaybackActivity configChanges——Task 8 注意 manifest 已含 configChanges）。
-- ⏸️ **Task 3（M3uParser TDD）刚开始：仅登记 in_progress，尚未派发实施代理，无半成品代码**。恢复时确认 `git log --oneline -1` 即本检查点提交、`git status` 除 `.claude/` 外干净，然后按计划 Task 3 派发实施代理。
-- 环境要点：PowerShell 5.1 无 `&&`；**gradlew 调用须同行内联** `$env:JAVA_HOME='D:\app\bigtext\tools\jdk17';`；分支 `feature/iptv-player`。
-- 执行方式：子代理驱动（implementer → spec review → quality review，逐任务），Task 4-11 未开始。
+- ✅ **Task 3 完成**：M3uParser TDD（实现 `9f6558f`，审查修补 `bad2c6a`，9 测试全绿）。评审修正了计划参考代码：`tvg-logo=""`→null、空名逗号行 `ci >= 0`（防 URL 带逗号）、补 `tvg-name` 兜底、预编译正则、`tvg-id` 空→null、BOM 用 `"﻿"` 转义（实际提交代码为准，见 Task 3 节末备注）。
+- **环境新增**：本机 fake-IP 系统代理（127.0.0.1:7893），Gradle JVM 不走系统代理导致新依赖解析超时——已在 `gradle.properties` 写入 `systemProp.http(s).proxy*` 4 行（换机器/关代理需删）。另：Write/Edit 工具会把 `"﻿"` 文本转成真实不可见字符，处理 BOM 须用 PowerShell 字节级写入并十六进制验证。
+- 环境要点：PowerShell 5.1 无 `&&`；**gradlew 调用须同行内联** `$env:JAVA_HOME='D:\app\bigtext\tools\jdk17';`（gradle.properties 的 java.home 已含，双保险）；分支 `feature/iptv-player`。
+- 执行方式：子代理驱动（implementer → spec review → quality review，逐任务），当前进行 Task 4。
 
 ---
 
@@ -531,7 +532,7 @@ object M3uParser {
         if (comma < 0) { attrs = line; name = "" } else { attrs = line.substring(0, comma); name = line.substring(comma + 1).trim() }
         return Pending(
             name = name.ifBlank { null },
-            logo = attr(attrs, "tvg-logo"),
+            logo = attr(attrs, "tvg-logo")?.ifBlank { null },
             group = attr(attrs, "group-title")?.ifBlank { null },
             tvgId = attr(attrs, "tvg-id"),
         )
@@ -569,6 +570,8 @@ Expected: `BUILD SUCCESSFUL`，7 个测试全绿。
 git add app/src
 git commit -m "[feat] M3uParser：标准/简式/裸URL/BOM 兼容，含单测"
 ```
+
+> **实现偏差说明（评审后修正，以提交 `bad2c6a` 为准）**：① `splitNameUrl` 用 `ci >= 0`（空名逗号行不产生带逗号的坏 URL）；② `parseExtInf` 提取 `tvg-name` 作显示名兜底（设计 §5.1 要求）；③ `tvg-logo`/`tvg-id` 空串归一为 null；④ 四个属性正则提升为 object 级预编译；⑤ BOM 字面量改为 `"﻿"` 转义（避免不可见字符被工具链吞掉）；⑥ 新增测试 `emptyNameCommaUrl`、`tvgNameUsedWhenDisplayNameEmpty`，共 9 例。
 
 ---
 
