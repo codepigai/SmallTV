@@ -24,6 +24,7 @@ class PlaybackActivity : AppCompatActivity() {
         const val EXTRA_URL = "url"
         const val EXTRA_TVG_ID = "tvg_id"   // 保持 Task 7 已提交值，勿改回 "tvgId"
         private const val LAST_CHANNEL_KEY = "lastChannel"
+        private const val ERROR_SWALLOW_MS = 10_000L
     }
 
     private val repo get() = (application as App).repo
@@ -38,6 +39,7 @@ class PlaybackActivity : AppCompatActivity() {
     private var chName: String = ""
     private var chUrl: String = ""
     private var chTvgId: String? = null
+    private var lastSwitchAt = 0L
 
     private val handler = Handler(Looper.getMainLooper())
     private val hideControls = Runnable { setControls(false) }
@@ -65,9 +67,11 @@ class PlaybackActivity : AppCompatActivity() {
         playerView.player = player
         player.addListener(object : Player.Listener {
             override fun onPlayerError(error: androidx.media3.common.PlaybackException) {
+                if (System.currentTimeMillis() - lastSwitchAt < ERROR_SWALLOW_MS) return
                 nowBar.text = "$chName　播放失败：${error.errorCodeName}（按返回退出或『下一台』切换）"
             }
         })
+        lastSwitchAt = System.currentTimeMillis()
         player.setMediaItem(MediaItem.fromUri(chUrl))
         player.prepare()
         player.playWhenReady = true
@@ -82,19 +86,26 @@ class PlaybackActivity : AppCompatActivity() {
         }
 
         loadEpg()
-        lifecycleScope.launch {
-            repo.saveState(LAST_CHANNEL_KEY, "$chName|$chUrl|${chTvgId ?: ""}")
-        }
+        refreshFavLabel()
+        saveLastChannel()
     }
 
     override fun onStart() { super.onStart(); player.playWhenReady = true; handler.post(poll) }
     override fun onStop() { super.onStop(); handler.removeCallbacks(poll); player.playWhenReady = false }
-    override fun onDestroy() { super.onDestroy(); handler.removeCallbacksAndMessages(null); player.release() }
+    override fun onDestroy() {
+        super.onDestroy()
+        handler.removeCallbacksAndMessages(null)
+        if (::player.isInitialized) player.release()
+    }
 
     override fun onKeyDown(keyCode: Int, event: KeyEvent?): Boolean {
         when (keyCode) {
-            KeyEvent.KEYCODE_DPAD_CENTER, KeyEvent.KEYCODE_ENTER -> { setControls(!controlsShown); return true }
+            KeyEvent.KEYCODE_DPAD_CENTER, KeyEvent.KEYCODE_ENTER -> {
+                if (event?.repeatCount != 0) return true
+                setControls(!controlsShown); return true
+            }
             KeyEvent.KEYCODE_MENU -> {
+                if (event?.repeatCount != 0) return true
                 infoShown = !infoShown; infoPanel.visibility = if (infoShown) View.VISIBLE else View.GONE
                 if (infoShown) updateInfo(); return true
             }
@@ -131,9 +142,25 @@ class PlaybackActivity : AppCompatActivity() {
     private fun restartWith(name: String, url: String, tvgId: String?) {
         chName = name; chUrl = url; chTvgId = tvgId
         nowBar.text = name
+        lastSwitchAt = System.currentTimeMillis()
         player.setMediaItem(MediaItem.fromUri(url))
         player.prepare(); player.playWhenReady = true
         loadEpg()
+        refreshFavLabel()
+        saveLastChannel()
+    }
+
+    private fun refreshFavLabel() {
+        lifecycleScope.launch {
+            findViewById<TextView>(R.id.ctrlFav).text =
+                if (repo.isFavorited(chName, chUrl)) "已收藏" else "收藏"
+        }
+    }
+
+    private fun saveLastChannel() {
+        lifecycleScope.launch {
+            repo.saveState(LAST_CHANNEL_KEY, "$chName|$chUrl|${chTvgId ?: ""}")
+        }
     }
 
     private fun toggleFav() {
