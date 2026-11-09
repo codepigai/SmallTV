@@ -24,9 +24,10 @@
 - ✅ **Task 8 完成**：播放页（实现 `bc2b32a`，质量修补 `9e0cb71` + 错误处理重修 `b4fcc65`，22 测试全绿）。预批准偏差：修正 A（`refreshEpg(Subscription)`）、修正 B（EpgActivity 增 companion `EXTRA_NAME/EXTRA_TVG_ID`，Task 9 必须复用这两个常量名与值）、EXTRA_TVG_ID 值保持 `"tvg_id"`。质量修补：onDestroy lateinit 守卫；ctrlFav 按 `repo.isFavorited` 回显（onCreate/restartWith）；lastChannel 每次切台写回；确定/菜单键 repeat 防抖。**首轮 10 秒吞错窗方案被复核否决（会吞首播/新流快速失败），改为监听器随源重建 + URL 快照丢弃旧流迟到错误（b4fcc65），零吞窗**。有意不修（真机验收看）：I2 确定键与控制按钮的框架派发（可点击 TextView 应自动消费 DPAD_CENTER——验收需实测确定键弹/收条与按钮激活均正常）、收起时 playerView.requestFocus 失效（M1）、快速连按切台竞态（M3）、toggleFavorite 无 try/catch 与首页同模式（M4）。
 - ✅ **Task 9 完成**：节目单页（实现 `a1fbedc`，Critical 修复 `b19ed61`，22 测试全绿）。预批准偏差：EpgActivity companion 保持 `EXTRA_TVG_ID="tvg_id"`（Task 8 修正 B 所加，值不采用计划笔误 "tvgId"）；修正 C=设计 §3.3 首页入口补漏——ChannelAdapter 长按→跳 EPG（HomeActivity 仅 +8 行）。质量修补：item_epg 行 `focusable=true` + 数据到达后 `list.post { list.requestFocus() }`（首版整页无可聚焦控件，遥控器无法滚动，Critical）。
 - ✅ **Task 10 完成**：订阅管理+编辑（实现 `a598c57`，质量修补 `8b74f09`，22 测试全绿）。唯一编译偏差：SubsActivity `adapter` 显式标注 `: SubAdapter`（Kotlin 递归类型推断）。质量修补六项：①`ChannelDao.replaceFor`/`EpgDao.replaceAll` @Transaction（刷新写入原子化，取消不再"清了没写"，落实 §6）；②btnRefresh 防重标志；③选中行 isSelected=选中（不再误绑 isCurrent），★ 仍表当前订阅；④删除 AlertDialog 二次确认；⑤保存防重（saving/loaded 标志+add 成功回填 existing 切编辑态，三条重复落库路径封死）+`subscriptionById` 安全调用；⑥无 EPG 源订阅残留清理（update 清空 EPG/删除订阅后若全库无 EPG 源则 `epgs.clear()`，全局表无外键系 §4 有意设计，勿无条件清）。布局：按钮行包 HorizontalScrollView、etName 补 inputType。
+- ✅ **Task 11 完成**：`install.ps1`（`05e9871`）。终审（whole-implementation review）结论 READY TO MERGE；四项 P1–P4 全部闭环——P2/P3 代码修复（`142985c` 信息条淡出+返回按钮，`66af4e4` onStart/onStop 守卫+EPG 不覆盖错误，定向复审 Approved with Minor notes）；P1（重连系 Media3 默认退避策略）与设计文档 §6 同步措辞；P4（本文档 Task 8 节悬空 "M5" 引用）已修。验收清单扩至 19 项。最终 APK `app\build\outputs\apk\debug\app-debug.apk`（约 8.7MB），clean 构建通过，22/22 单测绿。
 - **环境新增**：本机 fake-IP 系统代理（127.0.0.1:7893），Gradle JVM 不走系统代理导致新依赖解析超时——已在 `gradle.properties` 写入 `systemProp.http(s).proxy*` 4 行（换机器/关代理需删）。另：Write/Edit 工具会把 `"﻿"` 文本转成真实不可见字符，处理 BOM 须用 PowerShell 字节级写入并十六进制验证。
 - 环境要点：PowerShell 5.1 无 `&&`；**gradlew 调用须同行内联** `$env:JAVA_HOME='D:\app\bigtext\tools\jdk17';`（gradle.properties 的 java.home 已含，双保险）；分支 `feature/iptv-player`。
-- 执行方式：子代理驱动（implementer → spec review → quality review，逐任务），当前进行 Task 11（收尾）。
+- 执行方式：子代理驱动（implementer → spec review → quality review，逐任务），**11 个任务全部完成**，收尾进入 finishing-a-development-branch。
 
 ---
 
@@ -1937,7 +1938,9 @@ git commit -m "[feat] 播放页：Media3 播放、菜单键信息浮层、EPG �
 > 1. 预批准修正 A/B 与 EXTRA_TVG_ID="tvg_id"（见执行进度 Task 8 行）。EpgActivity 现有 companion：`EXTRA_NAME="name"`、`EXTRA_TVG_ID="tvg_id"`，Task 9 整体替换 EpgActivity 时必须保留这两个常量。
 > 2. 质量修补（`9e0cb71`）：onDestroy `::player.isInitialized` 守卫（缺 EXTRA_URL 早退路径）；`refreshFavLabel()` 用 repo.isFavorited 回显收藏按钮（onCreate+restartWith）；`saveLastChannel()` 抽方法且切台后重写；确定/菜单键 `repeatCount != 0` 直接消费。
 > 3. 错误处理重修（`b4fcc65`）：废弃 10 秒吞错时间窗（复核指出会吞首播与新流快速失败）；改为 `attachErrorListener()`——每次 setMediaItem 前 removeListener 旧监听并按当时 chUrl/chName 快照新建，onPlayerError 中 `urlSnap != chUrl` 丢弃旧流迟到错误，文案用 nameSnap。
-> 4. 有意不修（真机验收项）：I2 确定键派发（实测：控制条收起态按确定应弹出；弹出后焦点按钮按确定应激活「收藏/节目单」而非收起）；M1/M3/M4/M5 见 Task 8 行。
+> 4. 有意不修（真机验收项）：I2 确定键派发（实测：控制条收起态按确定应弹出；弹出后焦点按钮按确定应激活「收藏/节目单」而非收起）；M1/M3/M4 见执行进度 Task 8 行。
+> 5. 信息条淡出与返回按钮（终审 P2/P3 闭环，`142985c` + `66af4e4`）：nowBar 经 `touchBar()` 排 6 秒淡出（800ms 动画），五触点重现（onCreate/onStart/onKeyDown 首行/restartWith/EPG 成功）；`showErrorBar` 置 `barHasError` 后按键不再排程淡出，错误信息保持显示；EPG 成功路径加 `!barHasError` 守卫不再覆盖错误文本（66af4e4）；缺 EXTRA_URL 早退路径的 onStart/onStop 补 `::player.isInitialized` 守卫（与 onDestroy 一致，66af4e4）。控制条末位增 `ctrlBack`（返回→finish），OK 激活依赖与其余按钮相同的框架派发（验收项 11/15）。
+> 6. 断线重连（终审 P1）：未手写"3 次退避"，实际依赖 Media3 `DefaultLoadErrorHandlingPolicy` 默认无限指数退避自动重试——比设计原文更宽容，播中断流可自动恢复画面；设计文档 §6 措辞已同步，验收项 16 实测恢复表现。
 
 ---
 
@@ -2380,6 +2383,12 @@ Expected: `BUILD SUCCESSFUL`，全部单测通过。
 | 11 | 播放页：OK 弹出控制条后，方向键移到「收藏」「节目单」再按 OK 能激活；BACK 收起（T8 评审 I2 派发疑点） | ☐ |
 | 12 | 首页频道行长按进入该频道当日节目单（部分固件长按依赖按键 repeat） | ☐ |
 | 13 | 编辑订阅清空 EPG 链接保存后，节目信息不再显示（若已无其他 EPG 源订阅）；删除订阅有确认弹窗 | ☐ |
+| 14 | 播放页信息条约 6 秒淡出，按任意键或从其他页面返回立即重现；播放失败时错误文字不淡出，按多键仍保持，直到切台恢复 | ☐ |
+| 15 | 控制条末位「返回」按钮可获得焦点并按 OK 退出播放页（BACK 物理键在浮层/控制条显示时仅收起，与此按钮语义不同属有意设计） | ☐ |
+| 16 | 播中断网数秒后恢复：画面自动重连恢复，无需手动切台（Media3 默认指数退避重试，非固定 3 次；确认观感可接受） | ☐ |
+| 17 | 节目单页「正在播出」高亮为进入页面时一次性计算：跨节目边界或跨 0 点后久留不自动刷新，重新进入页面即恢复（接受此限制） | ☐ |
+| 18 | 首页左侧分组列表无选中高亮（焦点样式是否足够可辨）；★ 收藏标与当前节目名仅在重进首页/切页签/重绑时刷新——验收时确认可接受度 | ☐ |
+| 19 | 快速连按「下一台/上一台」多次：无卡死、黑屏错乱或残留旧频道错误信息（M3 切台竞态边缘） | ☐ |
 
 - [ ] **Step 4: Commit**
 
