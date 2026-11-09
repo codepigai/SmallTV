@@ -68,13 +68,14 @@ class XmlTvParserTest {
         assertEquals(1, r.size); assertEquals("跨天", r[0].title)
     }
 
-    @Test fun programmeBeforeChannelDefGetsOnlyIdKey() {
+    @Test fun programmeBeforeChannelDefStillGetsNameKeys() {
+        // name 键在解析结束后统一回填，与 <channel> 定义位置无关
         val now = System.currentTimeMillis()
         val body = "<programme channel=\"cctv2\" start=\"${stamp(0, 8, 0)}\" stop=\"${stamp(0, 9, 0)}\"><title>先序节目</title></programme>" +
             "<channel id=\"cctv2\"><display-name>CCTV-2</display-name></channel>"
         val r = XmlTvParser.parse(xml(body).toStream(), now)
         assertEquals(1, r.size)
-        assertEquals(listOf("id:cctv2"), r[0].channelKeys)
+        assertEquals(listOf("id:cctv2", "name:CCTV-2"), r[0].channelKeys)
     }
 
     @Test fun fractionalSecondsAndOffsetParse() {
@@ -82,5 +83,9 @@ class XmlTvParserTest {
         val c = Calendar.getInstance(TimeZone.getTimeZone("GMT+08:00")).apply { timeInMillis = ms }
         assertEquals(12, c.get(Calendar.HOUR_OF_DAY)); assertEquals(0, c.get(Calendar.MINUTE))
         assertEquals(500, c.get(Calendar.MILLISECOND))
+        val c2 = Calendar.getInstance(TimeZone.getTimeZone("GMT+08:00")).apply {
+            timeInMillis = XmlTvParser.parseXmlTvTime("20261108120000.123456+0800")!!
+        }
+        assertEquals(123, c2.get(Calendar.MILLISECOND))
     }
 }

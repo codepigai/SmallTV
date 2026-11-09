@@ -16,10 +16,10 @@ data class ParsedProgramme(
 )
 
 object XmlTvParser {
-    private val TIME_RE = Pattern.compile("^(\\d{14})(?:\\.(\\d{1,3}))?([+-]\\d{4})?$")
+    private val TIME_RE = Pattern.compile("^(\\d{14})(?:\\.(\\d{1,9}))?([+-]\\d{4})?$")
 
-    /** 流式解析 XMLTV；只保留 [今天00:00, 后天00:00) 的节目
-     * 假定 <channel> 定义位于 <programme> 之前（XMLTV 惯例）；乱序时 programme 仅获得 id: 键，name: 键缺失，降级为不显示节目信息。
+    /** 流式解析 XMLTV；只保留 [今天00:00, 后天00:00) 的节目。
+     * <channel> 定义可位于 programme 之前或之后：display-name 键在解析结束后统一回填，顺序无关。
      */
     fun parse(input: InputStream, now: Long = System.currentTimeMillis(), zone: TimeZone = TimeZone.getDefault()): List<ParsedProgramme> {
         val windowStart = dayStart(now, zone, 0)
@@ -33,7 +33,6 @@ object XmlTvParser {
         val displayNames = HashMap<String, ArrayList<String>>()
         val raw = ArrayList<Triple<String, Long, Long>>() // channel, start, stop（title 阶段再补）
         val titles = ArrayList<Pair<String?, String?>>()  // title, desc 与 raw 对齐
-        val namesAt = ArrayList<List<String>>()           // programme 结束时已知的 display-name，与 raw 对齐
         var curChannelId: String? = null
         var pChannel: String? = null
         var pStart = 0L
@@ -46,7 +45,7 @@ object XmlTvParser {
         while (ev != XmlPullParser.END_DOCUMENT) {
             when (ev) {
                 XmlPullParser.START_TAG -> when (parser.name) {
-                    "channel" -> curChannelId = parser.getAttributeValue(null, "id")
+                    "channel" -> curChannelId = parser.getAttributeValue(null, "id")?.trim()
                     "display-name" -> { text = StringBuilder() }
                     "programme" -> {
                         pChannel = parser.getAttributeValue(null, "channel")
@@ -70,10 +69,9 @@ object XmlTvParser {
                     "title" -> { pTitle = text?.toString()?.trim(); text = null }
                     "desc" -> { pDesc = text?.toString()?.trim(); text = null }
                     "programme" -> {
-                        val ch = pChannel
-                        if (ch != null && pStart > 0 && pStop > 0 && pStop > windowStart && pStart < windowEnd) {
+                        val ch = pChannel?.trim()
+                        if (ch != null && ch.isNotEmpty() && pStart > 0 && pStop > 0 && pStop > windowStart && pStart < windowEnd) {
                             raw.add(Triple(ch, pStart, pStop)); titles.add(pTitle to pDesc)
-                            namesAt.add(displayNames[ch]?.toList() ?: emptyList())
                         }
                         pChannel = null
                     }
@@ -88,8 +86,8 @@ object XmlTvParser {
             val (title, desc) = titles[i]
             if (title.isNullOrEmpty()) continue
             val keys = LinkedHashSet<String>().apply {
-                add("id:${ch.trim()}")
-                namesAt[i].forEach { add(EpgMatcher.nameKey(it)) }
+                add("id:$ch")
+                displayNames[ch]?.forEach { add(EpgMatcher.nameKey(it)) }
             }
             out.add(ParsedProgramme(keys.toList(), title, desc, s, e))
         }
@@ -111,7 +109,7 @@ object XmlTvParser {
             base.substring(0, 4).toInt(), base.substring(4, 6).toInt() - 1, base.substring(6, 8).toInt(),
             base.substring(8, 10).toInt(), base.substring(10, 12).toInt(), base.substring(12, 14).toInt(),
         )
-        if (fraction != null) c.set(Calendar.MILLISECOND, fraction.padEnd(3, '0').toInt())
+        if (fraction != null) c.set(Calendar.MILLISECOND, fraction.take(3).padEnd(3, '0').toInt())
         return c.timeInMillis
     }
 
