@@ -1,0 +1,21 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- 右侧滑出节目单面板（真机反馈 #5/#8）：由 activity_playback / activity_home 通过 include 复用 -->
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    android:id="@+id/epgPanel"
+    android:layout_width="460dp" android:layout_height="match_parent"
+    android:layout_gravity="end"
+    android:orientation="vertical"
+    android:background="#F20B0E17"
+    android:padding="24dp"
+    android:elevation="8dp"
+    android:visibility="gone">
+    <TextView android:id="@+id/epgPanelTitle"
+        android:layout_width="match_parent" android:layout_height="wrap_content"
+        android:textColor="#FFFFFF" android:textSize="18sp" android:layout_marginBottom="12dp" />
+    <androidx.recyclerview.widget.RecyclerView android:id="@+id/epgPanelList"
+        android:layout_width="match_parent" android:layout_height="0dp" android:layout_weight="1"
+        android:focusable="false" />
+    <TextView android:layout_width="match_parent" android:layout_height="wrap_content"
+        android:text="返回键关闭" android:textColor="#667788" android:textSize="13sp"
+        android:gravity="end" android:layout_marginTop="8dp" />
+</LinearLayout>

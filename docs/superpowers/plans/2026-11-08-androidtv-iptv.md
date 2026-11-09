@@ -25,6 +25,7 @@
 - ✅ **Task 9 完成**：节目单页（实现 `a1fbedc`，Critical 修复 `b19ed61`，22 测试全绿）。预批准偏差：EpgActivity companion 保持 `EXTRA_TVG_ID="tvg_id"`（Task 8 修正 B 所加，值不采用计划笔误 "tvgId"）；修正 C=设计 §3.3 首页入口补漏——ChannelAdapter 长按→跳 EPG（HomeActivity 仅 +8 行）。质量修补：item_epg 行 `focusable=true` + 数据到达后 `list.post { list.requestFocus() }`（首版整页无可聚焦控件，遥控器无法滚动，Critical）。
 - ✅ **Task 10 完成**：订阅管理+编辑（实现 `a598c57`，质量修补 `8b74f09`，22 测试全绿）。唯一编译偏差：SubsActivity `adapter` 显式标注 `: SubAdapter`（Kotlin 递归类型推断）。质量修补六项：①`ChannelDao.replaceFor`/`EpgDao.replaceAll` @Transaction（刷新写入原子化，取消不再"清了没写"，落实 §6）；②btnRefresh 防重标志；③选中行 isSelected=选中（不再误绑 isCurrent），★ 仍表当前订阅；④删除 AlertDialog 二次确认；⑤保存防重（saving/loaded 标志+add 成功回填 existing 切编辑态，三条重复落库路径封死）+`subscriptionById` 安全调用；⑥无 EPG 源订阅残留清理（update 清空 EPG/删除订阅后若全库无 EPG 源则 `epgs.clear()`，全局表无外键系 §4 有意设计，勿无条件清）。布局：按钮行包 HorizontalScrollView、etName 补 inputType。
 - ✅ **Task 11 完成**：`install.ps1`（`05e9871`）。终审（whole-implementation review）结论 READY TO MERGE；四项 P1–P4 全部闭环——P2/P3 代码修复（`142985c` 信息条淡出+返回按钮，`66af4e4` onStart/onStop 守卫+EPG 不覆盖错误，定向复审 Approved with Minor notes）；P1（重连系 Media3 默认退避策略）与设计文档 §6 同步措辞；P4（本文档 Task 8 节悬空 "M5" 引用）已修。验收清单扩至 19 项。最终 APK `app\build\outputs\apk\debug\app-debug.apk`（约 8.7MB），clean 构建通过，22/22 单测绿。
+- 🔄 **真机验收轮 1 完成（2026-11-10）**：#1–15、17–19 通过、#16 未测；7 条改进反馈（直播断流 fatal、内置控制器"设置"键、BACK 收信息条、节目单改右滑面板、信息条编码/码率/延迟、收藏夹返回失焦、列表延迟显示）全部定点修复，28/28 单测绿。根因与方案详见 Task 11 节「反馈修复轮 1」；新 APK 待复验清单 A–F。
 - **环境新增**：本机 fake-IP 系统代理（127.0.0.1:7893），Gradle JVM 不走系统代理导致新依赖解析超时——已在 `gradle.properties` 写入 `systemProp.http(s).proxy*` 4 行（换机器/关代理需删）。另：Write/Edit 工具会把 `"﻿"` 文本转成真实不可见字符，处理 BOM 须用 PowerShell 字节级写入并十六进制验证。
 - 环境要点：PowerShell 5.1 无 `&&`；**gradlew 调用须同行内联** `$env:JAVA_HOME='D:\app\bigtext\tools\jdk17';`（gradle.properties 的 java.home 已含，双保险）；分支 `feature/iptv-player`。
 - 执行方式：子代理驱动（implementer → spec review → quality review，逐任务），**11 个任务全部完成**，收尾进入 finishing-a-development-branch。
@@ -2370,25 +2371,50 @@ Expected: `BUILD SUCCESSFUL`，全部单测通过。
 
 | # | 验收项 | 通过 |
 |---|---|---|
-| 1 | TV 桌面出现「IPTV 电视」图标（横幅正常） | ☐ |
-| 2 | 订阅管理：添加真实 m3u，显示正确频道数 | ☐ |
-| 3 | 首页左分组右频道，方向键焦点顺畅，OK 进入播放 | ☐ |
-| 4 | 播放：画面出图、可切上一台/下一台、返回退出 | ☐ |
-| 5 | 播放中菜单键浮层：分辨率/编码/码率有真实值或「未知」 | ☐ |
-| 6 | 播放中底部显示正在播出/下一节目（配了 EPG 的订阅） | ☐ |
-| 7 | 节目单页当日列表 + 正在播出高亮 | ☐ |
-| 8 | 首页菜单键收藏/取消，收藏夹页签可快速播放 | ☐ |
-| 9 | 多订阅添加后「设为当前」，首页频道随之变化 | ☐ |
-| 10 | 断网播放出错提示 + 「下一台」可继续 | ☐ |
-| 11 | 播放页：OK 弹出控制条后，方向键移到「收藏」「节目单」再按 OK 能激活；BACK 收起（T8 评审 I2 派发疑点） | ☐ |
-| 12 | 首页频道行长按进入该频道当日节目单（部分固件长按依赖按键 repeat） | ☐ |
-| 13 | 编辑订阅清空 EPG 链接保存后，节目信息不再显示（若已无其他 EPG 源订阅）；删除订阅有确认弹窗 | ☐ |
-| 14 | 播放页信息条约 6 秒淡出，按任意键或从其他页面返回立即重现；播放失败时错误文字不淡出，按多键仍保持，直到切台恢复 | ☐ |
-| 15 | 控制条末位「返回」按钮可获得焦点并按 OK 退出播放页（BACK 物理键在浮层/控制条显示时仅收起，与此按钮语义不同属有意设计） | ☐ |
+| 1 | TV 桌面出现「IPTV 电视」图标（横幅正常） | ☑ |
+| 2 | 订阅管理：添加真实 m3u，显示正确频道数 | ☑ |
+| 3 | 首页左分组右频道，方向键焦点顺畅，OK 进入播放 | ☑ |
+| 4 | 播放：画面出图、可切上一台/下一台、返回退出 | ☑ |
+| 5 | 播放中菜单键浮层：分辨率/编码/码率有真实值或「未知」 | ☑ |
+| 6 | 播放中底部显示正在播出/下一节目（配了 EPG 的订阅） | ☑ |
+| 7 | 节目单页当日列表 + 正在播出高亮 | ☑ |
+| 8 | 首页菜单键收藏/取消，收藏夹页签可快速播放 | ☑ |
+| 9 | 多订阅添加后「设为当前」，首页频道随之变化 | ☑ |
+| 10 | 断网播放出错提示 + 「下一台」可继续 | ☑ |
+| 11 | 播放页：OK 弹出控制条后，方向键移到「收藏」「节目单」再按 OK 能激活；BACK 收起（T8 评审 I2 派发疑点） | ☑ |
+| 12 | 首页频道行长按进入该频道当日节目单（部分固件长按依赖按键 repeat） | ☑ |
+| 13 | 编辑订阅清空 EPG 链接保存后，节目信息不再显示（若已无其他 EPG 源订阅）；删除订阅有确认弹窗 | ☑ |
+| 14 | 播放页信息条约 6 秒淡出，按任意键或从其他页面返回立即重现；播放失败时错误文字不淡出，按多键仍保持，直到切台恢复 | ☑ |
+| 15 | 控制条末位「返回」按钮可获得焦点并按 OK 退出播放页（BACK 物理键在浮层/控制条显示时仅收起，与此按钮语义不同属有意设计） | ☑ |
 | 16 | 播中断网数秒后恢复：画面自动重连恢复，无需手动切台（Media3 默认指数退避重试，非固定 3 次；确认观感可接受） | ☐ |
-| 17 | 节目单页「正在播出」高亮为进入页面时一次性计算：跨节目边界或跨 0 点后久留不自动刷新，重新进入页面即恢复（接受此限制） | ☐ |
-| 18 | 首页左侧分组列表无选中高亮（焦点样式是否足够可辨）；★ 收藏标与当前节目名仅在重进首页/切页签/重绑时刷新——验收时确认可接受度 | ☐ |
-| 19 | 快速连按「下一台/上一台」多次：无卡死、黑屏错乱或残留旧频道错误信息（M3 切台竞态边缘） | ☐ |
+| 17 | 节目单页「正在播出」高亮为进入页面时一次性计算：跨节目边界或跨 0 点后久留不自动刷新，重新进入页面即恢复（接受此限制） | ☑ |
+| 18 | 首页左侧分组列表无选中高亮（焦点样式是否足够可辨）；★ 收藏标与当前节目名仅在重进首页/切页签/重绑时刷新——验收时确认可接受度 | ☑ |
+| 19 | 快速连按「下一台/上一台」多次：无卡死、黑屏错乱或残留旧频道错误信息（M3 切台竞态边缘） | ☑ |
+
+> **验收结果（2026-11-10）**：#1–15、17–19 通过；#16 未测（其防护在本轮已被强化，见下）。另收 7 条改进反馈，全部定点修复（见「反馈修复轮 1」）。注意：修复轮后节目单不再经 EpgActivity（已删），#7/#12/#17 的载体改为右侧滑出面板，验收标准不变。
+
+#### 反馈修复轮 1（2026-11-10，用户 TCL 真机反馈 8 条）
+
+| 反馈 | 根因/方案 | 落点 |
+|---|---|---|
+| 6. CCTV5 直播一段时间后断流 `ERROR_CODE_IO_BAD_HTTP_STATUS`，甚至起播即败 | **实测根因**：iPTV 中继 HLS 的头部分片（播放列表最后一条）存在最长约 20s 的未就绪 403 窗口（本机 24 轮模拟命中 6 次）；CDN 只对闭区间 Range 回 403（开区间 206，与本故障无关）。Media3 默认仅重试 3 次、首退避 8s，扛不过窗口即 fatal。三层防护：① `setLiveTargetOffsetMs(15000)` 起播点离线直播边缘；② `IptvLoadPolicy` 12 次短退避 1→2→4→8s；③ fatal 后自动重连 2→15s 退避、20 次封顶后停手提示 | `PlaybackActivity` + `net/Stream.kt` |
+| 3. 右下角「设置」无法被遥控选中 | 真身是 Media3 **内置控制器**溢出键（与自研按键分发冲突，永远拿不到焦点）。`app:use_controller="false"` 禁用；顺带 PlayerView `focusable=true` 修 M1（收起控制条后 requestFocus 失效） | `activity_playback.xml` |
+| 2. 进播放按返回直接退出，要求先关信息条 | BACK 不再触发「按键重现」；BACK 逐层收起：节目单面板 → 控制条/信息条 → 底部信息栏 → 退出 | `PlaybackActivity.onKeyDown` |
+| 5./8. 节目单全屏且中断播放 → 右侧滑出、不中断 | 新 `EpgPanel`（include 复用）：播放页 ctrlEpg 与首页长按均改本页右滑入；播放页 onStop 的 `playWhenReady=false` 不再被触发（不离开 Activity）；EpgActivity/布局/manifest 删除；面板开着切台标题跟随（restartWith→show） | `ui/EpgPanel.kt`、两布局、Manifest |
+| 4. 信息条有分辨率但编码/码率缺，求加网络延迟 | 编码补 `Format.codecs`（RFC6381→H.264/H.265/AAC…，纯函数 `codecDisplayName`）；码率真实值缺失回退带宽估计（Media3 1.x 无 getBandwidthMeter，经 `AnalyticsListener.onBandwidthEstimate` 收集）；新增 `RttProbe`（OkHttp TTFB，GET 到响应头即关）显示「网络 ~N ms」，MENU 打开信息条时立即+每 4s 探测 | `parse/FormatInfo.kt`、`net/RttProbe` 于 Stream.kt、`updateInfo` |
+| 7. 收藏夹播放返回后无法选中 | `notifyDataSetChanged` 甩焦点。修：三 Adapter `submit` 加 equals 守卫（数据没变不 notify——返回场景直接命中）；EPG 后台刷新改 `notifyItemRangeChanged(payload)` 原地重绑；`restoreListFocus` 兜底（焦点原本在列表且丢了→滚回原行重聚焦）；原本在页签则不抢焦点 | `HomeActivity` |
+| 8. 首页频道列表显示网络延迟 | 频道行**获焦即测**该频道 URL 的 TTFB（单飞 Job，防风暴），行内「网络~Nms」按 URL 缓存，payload 重绑不打断焦点 | `HomeActivity.probeChannel` + `ChannelAdapter.setRtt` |
+
+**单测**：新增 `FormatInfoTest` 6 项（编码映射/码率标注/延迟标注），全套 28/28 绿。
+**API 纠偏（1.2.1 实测）**：`DefaultLoadErrorHandlingPolicy` 在 `exoplayer.upstream` 包；`LoadErrorInfo.errorCount`（非 retryCount）；`setLiveTargetOffsetMs` 与 `setLoadErrorHandlingPolicy` 都挂在 `MediaSource.Factory`（ExoPlayer.Builder 无后者）。
+
+**复验清单（本轮修复项，装新 APK 后过）**：
+- [ ] A. CCTV5 连播 ≥10 分钟无断流；人为拔网线 10s 插回能自动恢复画面（含 #16）
+- [ ] B. 右下角不再出现「设置」；控制条收起后按键仍正常
+- [ ] C. 进播放立即按返回=先收底部信息条，再按才退出；菜单键浮层含编码/码率/网络延迟（估计值标「估」）
+- [ ] D. 播放页与首页的节目单从右侧滑出；播放页打开节目单时声音画面不中断，面板内返回先关面板；面板开着切台标题跟随
+- [ ] E. 收藏夹播放→返回，焦点仍在收藏夹列表可继续选择；频道行获焦后短暂显示「网络~ms」
+- [ ] F. 原 19 项回归重点：#11 控制条按钮 OK 激活（内置控制器禁用后）、#14 信息条淡出/重现
 
 - [ ] **Step 4: Commit**
 

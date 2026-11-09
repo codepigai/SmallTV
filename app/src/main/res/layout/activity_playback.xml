@@ -2,9 +2,12 @@
 <FrameLayout xmlns:android="http://schemas.android.com/apk/res/android"
     android:layout_width="match_parent" android:layout_height="match_parent">
 
+    <!-- use_controller=false：禁用 Media3 内置控制器（其右下角“设置”溢出键抢焦点且无法遥控激活，真机反馈 #3）；
+         focusable=true 作为收起浮层后的焦点锚点（原 M1 requestFocus 失效一并修复） -->
     <androidx.media3.ui.PlayerView android:id="@+id/playerView"
         android:layout_width="match_parent" android:layout_height="match_parent"
-        android:focusable="false"
+        android:focusable="true"
+        app:use_controller="false"
         app:resize_mode="fit" app:show_buffering="when_playing"
         xmlns:app="http://schemas.android.com/apk/res-auto" />
 
@@ -16,6 +19,8 @@
         <TextView android:id="@+id/infoVideo" android:layout_width="wrap_content" android:layout_height="wrap_content"
             android:textColor="#FFFFFF" android:textSize="15sp" />
         <TextView android:id="@+id/infoAudio" android:layout_width="wrap_content" android:layout_height="wrap_content"
+            android:textColor="#FFFFFF" android:textSize="15sp" android:layout_marginTop="6dp" />
+        <TextView android:id="@+id/infoNet" android:layout_width="wrap_content" android:layout_height="wrap_content"
             android:textColor="#FFFFFF" android:textSize="15sp" android:layout_marginTop="6dp" />
     </LinearLayout>
 
@@ -34,4 +39,6 @@
         <TextView android:id="@+id/ctrlEpg" style="@style/CtrlBtn" android:text="节目单" />
         <TextView android:id="@+id/ctrlBack" style="@style/CtrlBtn" android:text="返回" />
     </LinearLayout>
+
+    <include layout="@layout/view_epg_panel" />
 </FrameLayout>
