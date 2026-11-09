@@ -20,9 +20,10 @@
 - ✅ **Task 4 完成**：XmlTvParser+Match TDD（实现 `b3a33e0`，评审修补 `961a843` + 纠偏 `6dd80fc`，全套 22 测试全绿）。修正要点：`parseXmlTvTime` 透传 zone、小数秒（1–9 位，取前 3 位毫秒）、nowNext 删除不可达分支、channel id 统一 trim、**name 键顺序无关回填（`<channel>` 在 programme 前后均可，勿再"修正"为严格顺序）**。见 Task 4 节末备注。
 - ✅ **Task 5 完成**：Room 实体/DAO/Database + App.db（实现 `4b265d2`，评审补充 `ed0da4f`：`SubscriptionDao.setCurrentAtomically` @Transaction）。**Task 6 的 Repository 中设置当前订阅一律调 `setCurrentAtomically(id)`，勿手工 clear+set**。设计文档 §4 已同步（channels 含 tvgId、epg 复合主键）。
 - ✅ **Task 6 完成**：Fetcher+Repository（实现 `d0f4d9f`，评审修补 `7dd415c`）。关键契约：`Fetcher` **所有**失败路径只抛 `FetchException`（含响应体读取阶段；`withStream` 限域读取）；错误消息为中文（连接超时/DNS 解析失败/连接失败/服务器错误 $code，可直接进 Toast）；`setCurrentAtomically` 已接入；EPG 写入 `asSequence` 惰性 chunked。**UI（Task 7–10）约定：`catch (e: Exception)` 兜底（解析异常非 FetchException），`e is FetchException -> e.message` 展示原因**。
+- ✅ **Task 7 完成**：首页（实现 `d0bb4ce`，评审修补 `9c08814`，22 测试全绿）。预批准偏差：PlaybackActivity 增 companion 三常量 `EXTRA_NAME/EXTRA_URL/EXTRA_TVG_ID`（Task 8 沿用）；布局无 panelFav，showTab 直接切 `favList.visibility`。质量修补：EPG 后台刷新 15 分钟节流（仅成功记时，失败下次进首页重试）+成功后重绑频道列表；频道/收藏行失焦清空旁存字段（防菜单键操作错误频道）、showTab 重置。真机注意：★/当前节目仅在 reload/重绑时刷新；分组无选中高亮（验收时看是否补）。
 - **环境新增**：本机 fake-IP 系统代理（127.0.0.1:7893），Gradle JVM 不走系统代理导致新依赖解析超时——已在 `gradle.properties` 写入 `systemProp.http(s).proxy*` 4 行（换机器/关代理需删）。另：Write/Edit 工具会把 `"﻿"` 文本转成真实不可见字符，处理 BOM 须用 PowerShell 字节级写入并十六进制验证。
 - 环境要点：PowerShell 5.1 无 `&&`；**gradlew 调用须同行内联** `$env:JAVA_HOME='D:\app\bigtext\tools\jdk17';`（gradle.properties 的 java.home 已含，双保险）；分支 `feature/iptv-player`。
-- 执行方式：子代理驱动（implementer → spec review → quality review，逐任务），当前进行 Task 7。
+- 执行方式：子代理驱动（implementer → spec review → quality review，逐任务），当前进行 Task 8。
 
 ---
 
@@ -1651,6 +1652,12 @@ Expected: `BUILD SUCCESSFUL`。
 git add app/src
 git commit -m "[feat] 首页：页签、分组/频道/收藏列表、菜单键收藏"
 ```
+
+> **实现偏差说明（评审后修订，以代码为准）**：
+> 1. 预批准 A：`PlaybackActivity` 增 companion `EXTRA_NAME="name"/EXTRA_URL="url"/EXTRA_TVG_ID="tvg_id"`（占位逻辑未动，Task 8 沿用）。
+> 2. 预批准 B：布局无 panelFav 容器，`showTab` 直接 `favList.visibility = ...`。
+> 3. 质量修补（`9c08814`）：EPG 后台刷新加 15 分钟节流（`epgLastOk` 仅成功更新，失败下次进首页重试），成功后 `channelAdapter.notifyDataSetChanged()` 重绑；频道/收藏行 `setOnFocusChangeListener` 失焦上报 null（Android loss→gain 顺序保证同列表移动安全），`showTab` 重置 `focusedChannel/focusedFavorite`。
+> 4. 有意不修（评审 Minor，留待真机验收决定）：同 holder 同 pos 的 EPG 协程竞态（可自愈）、分组选中无高亮、reload 重复过滤/多次 notify、连按菜单键并发 reload。
 
 ---
 
