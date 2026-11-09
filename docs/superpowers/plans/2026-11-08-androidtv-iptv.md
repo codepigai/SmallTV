@@ -21,9 +21,10 @@
 - ✅ **Task 5 完成**：Room 实体/DAO/Database + App.db（实现 `4b265d2`，评审补充 `ed0da4f`：`SubscriptionDao.setCurrentAtomically` @Transaction）。**Task 6 的 Repository 中设置当前订阅一律调 `setCurrentAtomically(id)`，勿手工 clear+set**。设计文档 §4 已同步（channels 含 tvgId、epg 复合主键）。
 - ✅ **Task 6 完成**：Fetcher+Repository（实现 `d0f4d9f`，评审修补 `7dd415c`）。关键契约：`Fetcher` **所有**失败路径只抛 `FetchException`（含响应体读取阶段；`withStream` 限域读取）；错误消息为中文（连接超时/DNS 解析失败/连接失败/服务器错误 $code，可直接进 Toast）；`setCurrentAtomically` 已接入；EPG 写入 `asSequence` 惰性 chunked。**UI（Task 7–10）约定：`catch (e: Exception)` 兜底（解析异常非 FetchException），`e is FetchException -> e.message` 展示原因**。
 - ✅ **Task 7 完成**：首页（实现 `d0bb4ce`，评审修补 `9c08814`，22 测试全绿）。预批准偏差：PlaybackActivity 增 companion 三常量 `EXTRA_NAME/EXTRA_URL/EXTRA_TVG_ID`（Task 8 沿用）；布局无 panelFav，showTab 直接切 `favList.visibility`。质量修补：EPG 后台刷新 15 分钟节流（仅成功记时，失败下次进首页重试）+成功后重绑频道列表；频道/收藏行失焦清空旁存字段（防菜单键操作错误频道）、showTab 重置。真机注意：★/当前节目仅在 reload/重绑时刷新；分组无选中高亮（验收时看是否补）。
+- ✅ **Task 8 完成**：播放页（实现 `bc2b32a`，质量修补 `9e0cb71` + 错误处理重修 `b4fcc65`，22 测试全绿）。预批准偏差：修正 A（`refreshEpg(Subscription)`）、修正 B（EpgActivity 增 companion `EXTRA_NAME/EXTRA_TVG_ID`，Task 9 必须复用这两个常量名与值）、EXTRA_TVG_ID 值保持 `"tvg_id"`。质量修补：onDestroy lateinit 守卫；ctrlFav 按 `repo.isFavorited` 回显（onCreate/restartWith）；lastChannel 每次切台写回；确定/菜单键 repeat 防抖。**首轮 10 秒吞错窗方案被复核否决（会吞首播/新流快速失败），改为监听器随源重建 + URL 快照丢弃旧流迟到错误（b4fcc65），零吞窗**。有意不修（真机验收看）：I2 确定键与控制按钮的框架派发（可点击 TextView 应自动消费 DPAD_CENTER——验收需实测确定键弹/收条与按钮激活均正常）、收起时 playerView.requestFocus 失效（M1）、快速连按切台竞态（M3）、toggleFavorite 无 try/catch 与首页同模式（M4）。
 - **环境新增**：本机 fake-IP 系统代理（127.0.0.1:7893），Gradle JVM 不走系统代理导致新依赖解析超时——已在 `gradle.properties` 写入 `systemProp.http(s).proxy*` 4 行（换机器/关代理需删）。另：Write/Edit 工具会把 `"﻿"` 文本转成真实不可见字符，处理 BOM 须用 PowerShell 字节级写入并十六进制验证。
 - 环境要点：PowerShell 5.1 无 `&&`；**gradlew 调用须同行内联** `$env:JAVA_HOME='D:\app\bigtext\tools\jdk17';`（gradle.properties 的 java.home 已含，双保险）；分支 `feature/iptv-player`。
-- 执行方式：子代理驱动（implementer → spec review → quality review，逐任务），当前进行 Task 8。
+- 执行方式：子代理驱动（implementer → spec review → quality review，逐任务），当前进行 Task 9。
 
 ---
 
@@ -1929,6 +1930,12 @@ Expected: `BUILD SUCCESSFUL`。
 git add app/src
 git commit -m "[feat] 播放页：Media3 播放、菜单键信息浮层、EPG 信息条、控制行"
 ```
+
+> **实现偏差说明（评审后修订，以代码为准）**：
+> 1. 预批准修正 A/B 与 EXTRA_TVG_ID="tvg_id"（见执行进度 Task 8 行）。EpgActivity 现有 companion：`EXTRA_NAME="name"`、`EXTRA_TVG_ID="tvg_id"`，Task 9 整体替换 EpgActivity 时必须保留这两个常量。
+> 2. 质量修补（`9e0cb71`）：onDestroy `::player.isInitialized` 守卫（缺 EXTRA_URL 早退路径）；`refreshFavLabel()` 用 repo.isFavorited 回显收藏按钮（onCreate+restartWith）；`saveLastChannel()` 抽方法且切台后重写；确定/菜单键 `repeatCount != 0` 直接消费。
+> 3. 错误处理重修（`b4fcc65`）：废弃 10 秒吞错时间窗（复核指出会吞首播与新流快速失败）；改为 `attachErrorListener()`——每次 setMediaItem 前 removeListener 旧监听并按当时 chUrl/chName 快照新建，onPlayerError 中 `urlSnap != chUrl` 丢弃旧流迟到错误，文案用 nameSnap。
+> 4. 有意不修（真机验收项）：I2 确定键派发（实测：控制条收起态按确定应弹出；弹出后焦点按钮按确定应激活「收藏/节目单」而非收起）；M1/M3/M4/M5 见 Task 8 行。
 
 ---
 
