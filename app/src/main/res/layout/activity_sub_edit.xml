@@ -5,7 +5,7 @@
     <TextView android:id="@+id/editTitle" android:layout_width="match_parent" android:layout_height="wrap_content"
         android:text="添加订阅" android:textSize="24sp" android:textColor="#FFFFFF" android:layout_marginBottom="16dp" />
     <EditText android:id="@+id/etName" android:layout_width="match_parent" android:layout_height="wrap_content"
-        android:hint="订阅名称" android:textColor="#FFFFFF" android:textColorHint="#6677AA" android:maxLines="1" />
+        android:hint="订阅名称" android:textColor="#FFFFFF" android:textColorHint="#6677AA" android:maxLines="1" android:inputType="text" />
     <EditText android:id="@+id/etM3u" android:layout_width="match_parent" android:layout_height="wrap_content"
         android:hint="m3u 频道列表链接（http…）" android:textColor="#FFFFFF" android:textColorHint="#6677AA"
         android:maxLines="1" android:inputType="textUri" android:layout_marginTop="8dp" />

@@ -15,6 +15,8 @@ class SubEditActivity : AppCompatActivity() {
     companion object { const val EXTRA_SUB_ID = "subId" }
 
     private val repo get() = (application as App).repo
+    private var saving = false
+    private var loaded = false
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -34,34 +36,45 @@ class SubEditActivity : AppCompatActivity() {
                     etName.setText(it.name); etM3u.setText(it.m3uUrl); etEpg.setText(it.epgUrl ?: "")
                 }
             }
+            loaded = true
         }
 
         findViewById<TextView>(R.id.btnCancel).setOnClickListener { finish() }
         findViewById<TextView>(R.id.btnSave).setOnClickListener {
+            if (saving) return@setOnClickListener
+            if (subId >= 0 && !loaded) { msg.text = "正在加载原订阅信息…"; return@setOnClickListener }
             val name = etName.text.toString().trim()
             val m3u = etM3u.text.toString().trim()
             val epg = etEpg.text.toString().trim()
             if (name.isEmpty() || m3u.isEmpty()) { msg.text = "名称与 m3u 链接必填"; return@setOnClickListener }
             if (!(m3u.startsWith("http://") || m3u.startsWith("https://"))) { msg.text = "m3u 链接需以 http 开头"; return@setOnClickListener }
+            saving = true
             msg.text = "保存中，正在下载 m3u 测试…"
             lifecycleScope.launch {
                 try {
                     val id = withContext(Dispatchers.IO) {
                         val cur = existing
-                        val newId = if (cur == null) repo.addSubscription(name, m3u, epg)
-                        else { repo.updateSubscription(cur.copy(name = name, m3uUrl = m3u, epgUrl = epg.ifBlank { null })); cur.id }
+                        val newId = if (cur == null) {
+                            val nid = repo.addSubscription(name, m3u, epg)
+                            existing = repo.subscriptionById(nid)
+                            nid
+                        } else {
+                            repo.updateSubscription(cur.copy(name = name, m3uUrl = m3u, epgUrl = epg.ifBlank { null })); cur.id
+                        }
                         newId to repo.refreshChannels(newId)
                     }
                     var epgNote = "（无 EPG）"
                     if (epg.isNotBlank()) {
-                        epgNote = try { "，EPG ${repo.refreshEpg(repo.subscriptionById(id.first)!!)} 条节目" }
-                        catch (e: Exception) { "，EPG 解析失败：${e.message}" }
+                        epgNote = repo.subscriptionById(id.first)?.let { s ->
+                            try { "，EPG ${repo.refreshEpg(s)} 条节目" } catch (e: Exception) { "，EPG 解析失败：${e.message}" }
+                        } ?: "，EPG 源读取失败"
                     }
                     msg.text = "成功：解析到 ${id.second} 个频道$epgNote"
                     withContext(Dispatchers.IO) { Thread.sleep(700) }
                     finish()
                 } catch (e: Exception) {
                     msg.text = "失败：${e.message}（订阅已保存，可稍后在『刷新频道/EPG』重试）"
+                    saving = false
                 }
             }
         }

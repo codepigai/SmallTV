@@ -28,7 +28,11 @@ class Repository(private val db: AppDatabase, private val fetcher: Fetcher) {
         id
     }
 
-    suspend fun updateSubscription(sub: Subscription) = withContext(Dispatchers.IO) { subs.update(sub) }
+    suspend fun updateSubscription(sub: Subscription) = withContext(Dispatchers.IO) {
+        val old = subs.byId(sub.id)
+        subs.update(sub)
+        if (old?.epgUrl != null && sub.epgUrl.isNullOrBlank() && subs.all().none { !it.epgUrl.isNullOrBlank() }) epgs.clear()
+    }
 
     suspend fun setSubscriptionCurrent(id: Long) = withContext(Dispatchers.IO) {
         subs.setCurrentAtomically(id)
@@ -38,14 +42,14 @@ class Repository(private val db: AppDatabase, private val fetcher: Fetcher) {
         chans.clearFor(sub.id)
         subs.delete(sub)
         if (sub.isCurrent) subs.all().firstOrNull()?.let { subs.setCurrentAtomically(it.id) }
+        if (subs.all().none { !it.epgUrl.isNullOrBlank() }) epgs.clear()
     }
 
     // ---- 频道 ----
     suspend fun refreshChannels(subId: Long): Int = withContext(Dispatchers.IO) {
         val sub = subs.byId(subId) ?: return@withContext 0
         val parsed = M3uParser.parse(fetcher.fetchText(sub.m3uUrl))
-        chans.clearFor(subId)
-        chans.insertAll(parsed.map {
+        chans.replaceFor(subId, parsed.map {
             Channel(subscriptionId = subId, name = it.name, logoUrl = it.logo,
                 groupTitle = it.group, streamUrl = it.url, tvgId = it.tvgId, sortIndex = it.order)
         })
@@ -80,9 +84,8 @@ class Repository(private val db: AppDatabase, private val fetcher: Fetcher) {
     suspend fun refreshEpg(sub: Subscription): Int = withContext(Dispatchers.IO) {
         val url = sub.epgUrl ?: return@withContext 0
         val list = fetcher.withStream(url) { XmlTvParser.parse(BufferedInputStream(it)) }
-        epgs.clear()
-        list.asSequence().flatMap { p -> p.channelKeys.asSequence().map { k -> EpgProgramme(k, p.title, p.description, p.startMillis, p.stopMillis) } }
-            .chunked(500).forEach { epgs.insertAll(it) }
+        val rows = list.flatMap { p -> p.channelKeys.map { k -> EpgProgramme(k, p.title, p.description, p.startMillis, p.stopMillis) } }
+        epgs.replaceAll(rows)
         list.size
     }
 

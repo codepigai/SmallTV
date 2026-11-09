@@ -34,6 +34,13 @@ interface ChannelDao {
     @Query("SELECT * FROM channels WHERE subscriptionId = :subId ORDER BY sortIndex") suspend fun forSub(subId: Long): List<Channel>
     @Query("SELECT groupTitle FROM channels WHERE subscriptionId = :subId GROUP BY groupTitle ORDER BY MIN(sortIndex)") suspend fun groupsFor(subId: Long): List<String>
     @Query("SELECT COUNT(*) FROM channels WHERE subscriptionId = :subId") suspend fun countFor(subId: Long): Int
+
+    /** 原子替换该订阅频道：取消/失败不会留下清完没写入的空表 */
+    @Transaction
+    suspend fun replaceFor(subId: Long, list: List<Channel>) {
+        clearFor(subId)
+        insertAll(list)
+    }
 }
 
 @Dao
@@ -54,6 +61,12 @@ interface EpgDao {
     suspend fun upcoming(key: String, from: Long): List<EpgProgramme>
     @Query("SELECT * FROM epg_programmes WHERE channelKey = :key AND endTime >= :dayStart AND startTime < :dayEnd ORDER BY startTime")
     suspend fun day(key: String, dayStart: Long, dayEnd: Long): List<EpgProgramme>
+
+    @Transaction
+    suspend fun replaceAll(list: List<EpgProgramme>) {
+        clear()
+        list.chunked(500).forEach { insertAll(it) }
+    }
 }
 
 @Dao

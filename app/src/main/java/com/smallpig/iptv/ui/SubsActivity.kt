@@ -19,7 +19,10 @@ import kotlinx.coroutines.launch
 class SubsActivity : AppCompatActivity() {
     private val repo get() = (application as App).repo
     private var selected: Subscription? = null
-    private val adapter: SubAdapter by lazy { SubAdapter { s -> selected = s; adapter.notifyDataSetChanged() } }
+    private var refreshing = false
+    private val adapter: SubAdapter by lazy {
+        SubAdapter(selectedId = { selected?.id }) { s -> selected = s; adapter.notifyDataSetChanged() }
+    }
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -40,6 +43,8 @@ class SubsActivity : AppCompatActivity() {
         findViewById<View>(R.id.btnRefresh).setOnClickListener {
             val s = selected ?: return@setOnClickListener toast("先选中一个订阅")
             lifecycleScope.launch {
+                if (refreshing) { toast("刷新进行中…"); return@launch }
+                refreshing = true
                 toast("刷新中…")
                 try {
                     val n = repo.refreshChannels(s.id)
@@ -47,13 +52,19 @@ class SubsActivity : AppCompatActivity() {
                     if (s.epgUrl != null) e = repo.refreshEpg(s)
                     toast("频道 $n 个，EPG 节目 $e 个")
                 } catch (ex: Exception) { toast("刷新失败：${ex.message}") }
+                finally { refreshing = false }
             }
         }
         findViewById<View>(R.id.btnDelete).setOnClickListener {
             val s = selected ?: return@setOnClickListener toast("先选中一个订阅")
-            lifecycleScope.launch {
-                repo.deleteSubscription(s); selected = null; reload()
-            }
+            androidx.appcompat.app.AlertDialog.Builder(this)
+                .setTitle("删除订阅")
+                .setMessage("确定删除『${s.name}』？其频道缓存将一并清除。")
+                .setPositiveButton("删除") { _, _ ->
+                    lifecycleScope.launch { repo.deleteSubscription(s); selected = null; reload() }
+                }
+                .setNegativeButton("取消", null)
+                .show()
         }
     }
 
@@ -69,7 +80,7 @@ class SubsActivity : AppCompatActivity() {
     private fun toast(msg: String) = Toast.makeText(this, msg, Toast.LENGTH_SHORT).show()
 }
 
-private class SubAdapter(val onClick: (Subscription) -> Unit) : RecyclerView.Adapter<SubAdapter.VH>() {
+private class SubAdapter(val selectedId: () -> Long?, val onClick: (Subscription) -> Unit) : RecyclerView.Adapter<SubAdapter.VH>() {
     private var items: List<Subscription> = emptyList()
     private var counts: Map<Long, Int> = emptyMap()
     fun submit(list: List<Subscription>, counts: Map<Long, Int>) { items = list; this.counts = counts; notifyDataSetChanged() }
@@ -82,7 +93,7 @@ private class SubAdapter(val onClick: (Subscription) -> Unit) : RecyclerView.Ada
     override fun getItemCount() = items.size
     override fun onBindViewHolder(h: VH, pos: Int) {
         val s = items[pos]
-        h.itemView.isSelected = s.isCurrent
+        h.itemView.isSelected = (s.id == selectedId())
         h.name.text = if (s.isCurrent) "★ ${s.name}" else s.name
         h.meta.text = "${counts[s.id] ?: 0} 个频道　" +
             (if (s.epgUrl != null) "EPG 已配置" else "无 EPG") + "　" + s.m3uUrl
