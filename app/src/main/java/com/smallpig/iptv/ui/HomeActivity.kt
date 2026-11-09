@@ -47,6 +47,12 @@ class HomeActivity : AppCompatActivity() {
     private val channelAdapter by lazy {
         ChannelAdapter(
             onClick = { play(it) },
+            onLongClick = { ch ->
+                startActivity(Intent(this, EpgActivity::class.java).apply {
+                    putExtra(EpgActivity.EXTRA_NAME, ch.name)
+                    putExtra(EpgActivity.EXTRA_TVG_ID, ch.tvgId)
+                })
+            },
             onFocus = { focusedChannel = it },
             isFav = { FavoriteKey.of(it.name, it.streamUrl) in favKeys },
             epgFor = { ch -> repo.channelNow(ch.name, ch.tvgId)?.title },
@@ -179,6 +185,7 @@ private class GroupAdapter(val onClick: (String?) -> Unit) : RecyclerView.Adapte
 
 private class ChannelAdapter(
     val onClick: (Channel) -> Unit,
+    val onLongClick: (Channel) -> Unit,
     val onFocus: (Channel?) -> Unit,
     val isFav: (Channel) -> Boolean,
     val epgFor: suspend (Channel) -> String?,
@@ -203,6 +210,7 @@ private class ChannelAdapter(
         val ctx = h.itemView.context
         if (c.logoUrl != null) Glide.with(ctx).load(c.logoUrl).into(h.logo) else h.logo.setImageDrawable(null)
         h.itemView.setOnClickListener { onClick(c) }
+        h.itemView.setOnLongClickListener { onLongClick(c); true }
         h.itemView.setOnFocusChangeListener { _, has -> onFocus(if (has) c else null) }
         scope.launch {
             val t = epgFor(c)
