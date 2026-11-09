@@ -43,6 +43,22 @@ class PlaybackActivity : AppCompatActivity() {
     private val handler = Handler(Looper.getMainLooper())
     private val hideControls = Runnable { setControls(false) }
 
+    private var barHasError = false
+    private val hideBar = Runnable { nowBar.animate().alpha(0f).setDuration(800).start() }
+    private fun touchBar() {
+        nowBar.animate().cancel()
+        nowBar.alpha = 1f
+        handler.removeCallbacks(hideBar)
+        if (!barHasError) handler.postDelayed(hideBar, 6000)
+    }
+    private fun showErrorBar(msg: String) {
+        barHasError = true
+        nowBar.animate().cancel()
+        nowBar.alpha = 1f
+        handler.removeCallbacks(hideBar)
+        nowBar.text = msg
+    }
+
     private val poll = object : Runnable {
         override fun run() {
             if (infoShown) updateInfo()
@@ -60,7 +76,7 @@ class PlaybackActivity : AppCompatActivity() {
         infoPanel = findViewById(R.id.infoPanel)
         nowBar = findViewById(R.id.nowBar)
         controls = findViewById(R.id.controls)
-        nowBar.text = chName
+        nowBar.text = chName; touchBar()
 
         player = ExoPlayer.Builder(this).build()
         playerView.player = player
@@ -77,13 +93,14 @@ class PlaybackActivity : AppCompatActivity() {
                 putExtra(EpgActivity.EXTRA_NAME, chName); putExtra(EpgActivity.EXTRA_TVG_ID, chTvgId)
             })
         }
+        findViewById<TextView>(R.id.ctrlBack).setOnClickListener { finish() }
 
         loadEpg()
         refreshFavLabel()
         saveLastChannel()
     }
 
-    override fun onStart() { super.onStart(); player.playWhenReady = true; handler.post(poll) }
+    override fun onStart() { super.onStart(); player.playWhenReady = true; handler.post(poll); touchBar() }
     override fun onStop() { super.onStop(); handler.removeCallbacks(poll); player.playWhenReady = false }
     override fun onDestroy() {
         super.onDestroy()
@@ -92,6 +109,7 @@ class PlaybackActivity : AppCompatActivity() {
     }
 
     override fun onKeyDown(keyCode: Int, event: KeyEvent?): Boolean {
+        touchBar()
         when (keyCode) {
             KeyEvent.KEYCODE_DPAD_CENTER, KeyEvent.KEYCODE_ENTER -> {
                 if (event?.repeatCount != 0) return true
@@ -134,7 +152,7 @@ class PlaybackActivity : AppCompatActivity() {
 
     private fun restartWith(name: String, url: String, tvgId: String?) {
         chName = name; chUrl = url; chTvgId = tvgId
-        nowBar.text = name
+        barHasError = false; nowBar.text = name; touchBar()
         attachErrorListener()
         player.setMediaItem(MediaItem.fromUri(url))
         player.prepare(); player.playWhenReady = true
@@ -150,7 +168,7 @@ class PlaybackActivity : AppCompatActivity() {
         val l = object : Player.Listener {
             override fun onPlayerError(error: androidx.media3.common.PlaybackException) {
                 if (urlSnap != chUrl) return
-                nowBar.text = "$nameSnap　播放失败：${error.errorCodeName}（按返回退出或『下一台』切换）"
+                showErrorBar("$nameSnap　播放失败：${error.errorCodeName}（按返回退出或『下一台』切换）")
             }
         }
         errListener = l
@@ -187,11 +205,13 @@ class PlaybackActivity : AppCompatActivity() {
             try {
                 val (cur, next) = repo.nowNext(chName, chTvgId)
                 if (cur != null || next != null) {
+                    barHasError = false
                     nowBar.text = buildString {
                         append(chName)
                         cur?.let { append("　正在：${it.title}") }
                         next?.let { append("　接下：${it.title}") }
                     }
+                    touchBar()
                 }
             } catch (_: Exception) {}
         }

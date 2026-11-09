@@ -32,5 +32,6 @@
         <TextView android:id="@+id/ctrlNext" style="@style/CtrlBtn" android:text="下一台" />
         <TextView android:id="@+id/ctrlFav" style="@style/CtrlBtn" android:text="收藏" />
         <TextView android:id="@+id/ctrlEpg" style="@style/CtrlBtn" android:text="节目单" />
+        <TextView android:id="@+id/ctrlBack" style="@style/CtrlBtn" android:text="返回" />
     </LinearLayout>
 </FrameLayout>
