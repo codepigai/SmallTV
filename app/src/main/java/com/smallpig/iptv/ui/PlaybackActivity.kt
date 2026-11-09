@@ -24,7 +24,6 @@ class PlaybackActivity : AppCompatActivity() {
         const val EXTRA_URL = "url"
         const val EXTRA_TVG_ID = "tvg_id"   // 保持 Task 7 已提交值，勿改回 "tvgId"
         private const val LAST_CHANNEL_KEY = "lastChannel"
-        private const val ERROR_SWALLOW_MS = 10_000L
     }
 
     private val repo get() = (application as App).repo
@@ -39,7 +38,7 @@ class PlaybackActivity : AppCompatActivity() {
     private var chName: String = ""
     private var chUrl: String = ""
     private var chTvgId: String? = null
-    private var lastSwitchAt = 0L
+    private var errListener: Player.Listener? = null
 
     private val handler = Handler(Looper.getMainLooper())
     private val hideControls = Runnable { setControls(false) }
@@ -65,13 +64,7 @@ class PlaybackActivity : AppCompatActivity() {
 
         player = ExoPlayer.Builder(this).build()
         playerView.player = player
-        player.addListener(object : Player.Listener {
-            override fun onPlayerError(error: androidx.media3.common.PlaybackException) {
-                if (System.currentTimeMillis() - lastSwitchAt < ERROR_SWALLOW_MS) return
-                nowBar.text = "$chName　播放失败：${error.errorCodeName}（按返回退出或『下一台』切换）"
-            }
-        })
-        lastSwitchAt = System.currentTimeMillis()
+        attachErrorListener()
         player.setMediaItem(MediaItem.fromUri(chUrl))
         player.prepare()
         player.playWhenReady = true
@@ -142,12 +135,26 @@ class PlaybackActivity : AppCompatActivity() {
     private fun restartWith(name: String, url: String, tvgId: String?) {
         chName = name; chUrl = url; chTvgId = tvgId
         nowBar.text = name
-        lastSwitchAt = System.currentTimeMillis()
+        attachErrorListener()
         player.setMediaItem(MediaItem.fromUri(url))
         player.prepare(); player.playWhenReady = true
         loadEpg()
         refreshFavLabel()
         saveLastChannel()
+    }
+
+    private fun attachErrorListener() {
+        errListener?.let { player.removeListener(it) }
+        val urlSnap = chUrl
+        val nameSnap = chName
+        val l = object : Player.Listener {
+            override fun onPlayerError(error: androidx.media3.common.PlaybackException) {
+                if (urlSnap != chUrl) return
+                nowBar.text = "$nameSnap　播放失败：${error.errorCodeName}（按返回退出或『下一台』切换）"
+            }
+        }
+        errListener = l
+        player.addListener(l)
     }
 
     private fun refreshFavLabel() {
