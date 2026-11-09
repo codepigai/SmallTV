@@ -40,6 +40,7 @@ class EpgActivity : AppCompatActivity() {
                 val now = System.currentTimeMillis()
                 val idx = rows.indexOfLast { it.startTime <= now }
                 if (idx >= 0) list.scrollToPosition(maxOf(0, idx - 2))
+                list.post { list.requestFocus() }
                 if (rows.isEmpty()) findViewById<TextView>(R.id.epgTitle).text = "$name · 今日节目单（无节目信息）"
             }
         }
