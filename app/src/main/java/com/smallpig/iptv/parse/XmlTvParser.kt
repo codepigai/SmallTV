@@ -16,9 +16,11 @@ data class ParsedProgramme(
 )
 
 object XmlTvParser {
-    private val TIME_RE = Pattern.compile("^(\\d{14})(?:\\.\\d+)?([+-]\\d{4})?$")
+    private val TIME_RE = Pattern.compile("^(\\d{14})(?:\\.(\\d{1,3}))?([+-]\\d{4})?$")
 
-    /** 流式解析 XMLTV；只保留 [今天00:00, 后天00:00) 的节目 */
+    /** 流式解析 XMLTV；只保留 [今天00:00, 后天00:00) 的节目
+     * 假定 <channel> 定义位于 <programme> 之前（XMLTV 惯例）；乱序时 programme 仅获得 id: 键，name: 键缺失，降级为不显示节目信息。
+     */
     fun parse(input: InputStream, now: Long = System.currentTimeMillis(), zone: TimeZone = TimeZone.getDefault()): List<ParsedProgramme> {
         val windowStart = dayStart(now, zone, 0)
         val windowEnd = dayStart(now, zone, 2)
@@ -31,6 +33,7 @@ object XmlTvParser {
         val displayNames = HashMap<String, ArrayList<String>>()
         val raw = ArrayList<Triple<String, Long, Long>>() // channel, start, stop（title 阶段再补）
         val titles = ArrayList<Pair<String?, String?>>()  // title, desc 与 raw 对齐
+        val namesAt = ArrayList<List<String>>()           // programme 结束时已知的 display-name，与 raw 对齐
         var curChannelId: String? = null
         var pChannel: String? = null
         var pStart = 0L
@@ -47,8 +50,8 @@ object XmlTvParser {
                     "display-name" -> { text = StringBuilder() }
                     "programme" -> {
                         pChannel = parser.getAttributeValue(null, "channel")
-                        pStart = parseXmlTvTime(parser.getAttributeValue(null, "start")) ?: -1
-                        pStop = parseXmlTvTime(parser.getAttributeValue(null, "stop")) ?: -1
+                        pStart = parseXmlTvTime(parser.getAttributeValue(null, "start"), zone) ?: -1
+                        pStop = parseXmlTvTime(parser.getAttributeValue(null, "stop"), zone) ?: -1
                         pTitle = null; pDesc = null
                     }
                     "title" -> { text = StringBuilder() }
@@ -58,8 +61,9 @@ object XmlTvParser {
                 XmlPullParser.END_TAG -> when (parser.name) {
                     "display-name" -> {
                         val v = text?.toString()?.trim()
-                        if (v != null && v.isNotEmpty() && curChannelId != null)
-                            displayNames.getOrPut(curChannelId!!) { arrayListOf() }.add(v)
+                        val cid = curChannelId
+                        if (!v.isNullOrEmpty() && cid != null)
+                            displayNames.getOrPut(cid) { arrayListOf() }.add(v)
                         text = null
                     }
                     "channel" -> curChannelId = null
@@ -69,6 +73,7 @@ object XmlTvParser {
                         val ch = pChannel
                         if (ch != null && pStart > 0 && pStop > 0 && pStop > windowStart && pStart < windowEnd) {
                             raw.add(Triple(ch, pStart, pStop)); titles.add(pTitle to pDesc)
+                            namesAt.add(displayNames[ch]?.toList() ?: emptyList())
                         }
                         pChannel = null
                     }
@@ -83,28 +88,30 @@ object XmlTvParser {
             val (title, desc) = titles[i]
             if (title.isNullOrEmpty()) continue
             val keys = LinkedHashSet<String>().apply {
-                add("id:$ch")
-                displayNames[ch]?.forEach { add(EpgMatcher.nameKey(it)) }
+                add("id:${ch.trim()}")
+                namesAt[i].forEach { add(EpgMatcher.nameKey(it)) }
             }
             out.add(ParsedProgramme(keys.toList(), title, desc, s, e))
         }
         return out
     }
 
-    fun parseXmlTvTime(raw: String?): Long? {
+    fun parseXmlTvTime(raw: String?, zone: TimeZone = TimeZone.getDefault()): Long? {
         if (raw == null) return null
         val t = raw.trim().replace(" ", "")
         val m = TIME_RE.matcher(t)
         if (!m.matches()) return null
         val base = m.group(1)!!
-        val off = m.group(2) ?: ""
-        val zone = if (off.isEmpty()) TimeZone.getDefault() else TimeZone.getTimeZone("GMT$off")
-        val c = Calendar.getInstance(zone)
+        val fraction = m.group(2)
+        val off = m.group(3) ?: ""
+        val tz = if (off.isEmpty()) zone else TimeZone.getTimeZone("GMT$off")
+        val c = Calendar.getInstance(tz)
         c.clear()
         c.set(
             base.substring(0, 4).toInt(), base.substring(4, 6).toInt() - 1, base.substring(6, 8).toInt(),
             base.substring(8, 10).toInt(), base.substring(10, 12).toInt(), base.substring(12, 14).toInt(),
         )
+        if (fraction != null) c.set(Calendar.MILLISECOND, fraction.padEnd(3, '0').toInt())
         return c.timeInMillis
     }
 

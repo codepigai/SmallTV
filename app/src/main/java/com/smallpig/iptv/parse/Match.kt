@@ -12,7 +12,6 @@ object EpgMatcher {
         val sorted = items.sortedBy(startOf)
         val cur = sorted.lastOrNull { startOf(it) <= now && stopOf(it) > now }
         val next = sorted.firstOrNull { startOf(it) > now }
-            ?: if (cur != null) sorted.firstOrNull { startOf(it) >= stopOf(cur) && it !== cur } else null
         return cur to next
     }
 }
