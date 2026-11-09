@@ -5,6 +5,7 @@ import androidx.room.Delete
 import androidx.room.Insert
 import androidx.room.OnConflictStrategy
 import androidx.room.Query
+import androidx.room.Transaction
 import androidx.room.Update
 
 @Dao
@@ -17,6 +18,13 @@ interface SubscriptionDao {
     @Query("SELECT * FROM subscriptions WHERE isCurrent = 1 LIMIT 1") suspend fun current(): Subscription?
     @Query("UPDATE subscriptions SET isCurrent = 0") suspend fun clearCurrent()
     @Query("UPDATE subscriptions SET isCurrent = 1 WHERE id = :id") suspend fun setCurrent(id: Long)
+
+    /** 保证"仅一条 current"不变量的原子入口，调用方勿再手工 clear+set */
+    @Transaction
+    suspend fun setCurrentAtomically(id: Long) {
+        clearCurrent()
+        setCurrent(id)
+    }
 }
 
 @Dao
