@@ -1,0 +1,36 @@
+<?xml version="1.0" encoding="utf-8"?>
+<FrameLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    android:layout_width="match_parent" android:layout_height="match_parent">
+
+    <androidx.media3.ui.PlayerView android:id="@+id/playerView"
+        android:layout_width="match_parent" android:layout_height="match_parent"
+        android:focusable="false"
+        app:resize_mode="fit" app:show_buffering="when_playing"
+        xmlns:app="http://schemas.android.com/apk/res-auto" />
+
+    <LinearLayout android:id="@+id/infoPanel"
+        android:layout_width="wrap_content" android:layout_height="wrap_content"
+        android:layout_gravity="top|end" android:layout_margin="32dp"
+        android:orientation="vertical" android:background="#B0000000" android:padding="16dp"
+        android:visibility="gone">
+        <TextView android:id="@+id/infoVideo" android:layout_width="wrap_content" android:layout_height="wrap_content"
+            android:textColor="#FFFFFF" android:textSize="15sp" />
+        <TextView android:id="@+id/infoAudio" android:layout_width="wrap_content" android:layout_height="wrap_content"
+            android:textColor="#FFFFFF" android:textSize="15sp" android:layout_marginTop="6dp" />
+    </LinearLayout>
+
+    <TextView android:id="@+id/nowBar"
+        android:layout_width="match_parent" android:layout_height="wrap_content"
+        android:layout_gravity="bottom" android:background="#80000000"
+        android:padding="12dp" android:textColor="#DDDDDD" android:textSize="16sp" />
+
+    <LinearLayout android:id="@+id/controls"
+        android:layout_width="wrap_content" android:layout_height="wrap_content"
+        android:layout_gravity="bottom|end" android:layout_marginEnd="32dp" android:layout_marginBottom="64dp"
+        android:orientation="horizontal" android:visibility="gone">
+        <TextView android:id="@+id/ctrlPrev" style="@style/CtrlBtn" android:text="上一台" />
+        <TextView android:id="@+id/ctrlNext" style="@style/CtrlBtn" android:text="下一台" />
+        <TextView android:id="@+id/ctrlFav" style="@style/CtrlBtn" android:text="收藏" />
+        <TextView android:id="@+id/ctrlEpg" style="@style/CtrlBtn" android:text="节目单" />
+    </LinearLayout>
+</FrameLayout>
