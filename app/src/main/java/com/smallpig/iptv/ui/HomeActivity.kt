@@ -41,6 +41,7 @@ class HomeActivity : AppCompatActivity() {
     private var focusedChannel: Channel? = null
     private var focusedFavorite: Favorite? = null
     private var epgRefreshing = false
+    private var epgLastOk = 0L
 
     private val groupAdapter by lazy { GroupAdapter { group -> currentGroup = group; channelAdapter.submit(visibleChannels()) } }
     private val channelAdapter by lazy {
@@ -78,6 +79,8 @@ class HomeActivity : AppCompatActivity() {
 
     private fun showTab(idx: Int) {
         showingFav = idx == 1
+        focusedChannel = null
+        focusedFavorite = null
         panelBrowse.visibility = if (showingFav) View.GONE else View.VISIBLE
         favList.visibility = if (showingFav) View.VISIBLE else View.GONE
         tabs.forEachIndexed { i, t -> t.isSelected = i == idx }
@@ -102,10 +105,14 @@ class HomeActivity : AppCompatActivity() {
         groupAdapter.submit(listOf<String?>(null) + repo.groups(s.id))
         if (currentGroup != null && visibleChannels().isEmpty()) currentGroup = null
         channelAdapter.submit(visibleChannels())
-        if (!epgRefreshing && s.epgUrl != null) {
+        if (!epgRefreshing && s.epgUrl != null && System.currentTimeMillis() - epgLastOk > EPG_REFRESH_MS) {
             epgRefreshing = true
             lifecycleScope.launch {
-                try { repo.refreshEpg(s) } catch (_: Exception) {}
+                try {
+                    repo.refreshEpg(s)
+                    epgLastOk = System.currentTimeMillis()
+                    channelAdapter.notifyDataSetChanged()
+                } catch (_: Exception) {}
                 epgRefreshing = false
             }
         }
@@ -151,6 +158,10 @@ class HomeActivity : AppCompatActivity() {
         }
         return super.onKeyDown(keyCode, event)
     }
+
+    companion object {
+        private const val EPG_REFRESH_MS = 15 * 60_000L
+    }
 }
 
 private class GroupAdapter(val onClick: (String?) -> Unit) : RecyclerView.Adapter<GroupAdapter.VH>() {
@@ -192,7 +203,7 @@ private class ChannelAdapter(
         val ctx = h.itemView.context
         if (c.logoUrl != null) Glide.with(ctx).load(c.logoUrl).into(h.logo) else h.logo.setImageDrawable(null)
         h.itemView.setOnClickListener { onClick(c) }
-        h.itemView.setOnFocusChangeListener { _, has -> if (has) onFocus(c) }
+        h.itemView.setOnFocusChangeListener { _, has -> onFocus(if (has) c else null) }
         scope.launch {
             val t = epgFor(c)
             if (h.bindingAdapterPosition == pos) h.now.text = t ?: ""
@@ -223,6 +234,6 @@ private class FavoriteAdapter(
         val ctx = h.itemView.context
         if (f.logoUrl != null) Glide.with(ctx).load(f.logoUrl).into(h.logo) else h.logo.setImageDrawable(null)
         h.itemView.setOnClickListener { onClick(f) }
-        h.itemView.setOnFocusChangeListener { _, has -> if (has) onFocus(f) }
+        h.itemView.setOnFocusChangeListener { _, has -> onFocus(if (has) f else null) }
     }
 }
