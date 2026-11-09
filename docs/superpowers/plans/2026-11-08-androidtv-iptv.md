@@ -23,9 +23,10 @@
 - ✅ **Task 7 完成**：首页（实现 `d0bb4ce`，评审修补 `9c08814`，22 测试全绿）。预批准偏差：PlaybackActivity 增 companion 三常量 `EXTRA_NAME/EXTRA_URL/EXTRA_TVG_ID`（Task 8 沿用）；布局无 panelFav，showTab 直接切 `favList.visibility`。质量修补：EPG 后台刷新 15 分钟节流（仅成功记时，失败下次进首页重试）+成功后重绑频道列表；频道/收藏行失焦清空旁存字段（防菜单键操作错误频道）、showTab 重置。真机注意：★/当前节目仅在 reload/重绑时刷新；分组无选中高亮（验收时看是否补）。
 - ✅ **Task 8 完成**：播放页（实现 `bc2b32a`，质量修补 `9e0cb71` + 错误处理重修 `b4fcc65`，22 测试全绿）。预批准偏差：修正 A（`refreshEpg(Subscription)`）、修正 B（EpgActivity 增 companion `EXTRA_NAME/EXTRA_TVG_ID`，Task 9 必须复用这两个常量名与值）、EXTRA_TVG_ID 值保持 `"tvg_id"`。质量修补：onDestroy lateinit 守卫；ctrlFav 按 `repo.isFavorited` 回显（onCreate/restartWith）；lastChannel 每次切台写回；确定/菜单键 repeat 防抖。**首轮 10 秒吞错窗方案被复核否决（会吞首播/新流快速失败），改为监听器随源重建 + URL 快照丢弃旧流迟到错误（b4fcc65），零吞窗**。有意不修（真机验收看）：I2 确定键与控制按钮的框架派发（可点击 TextView 应自动消费 DPAD_CENTER——验收需实测确定键弹/收条与按钮激活均正常）、收起时 playerView.requestFocus 失效（M1）、快速连按切台竞态（M3）、toggleFavorite 无 try/catch 与首页同模式（M4）。
 - ✅ **Task 9 完成**：节目单页（实现 `a1fbedc`，Critical 修复 `b19ed61`，22 测试全绿）。预批准偏差：EpgActivity companion 保持 `EXTRA_TVG_ID="tvg_id"`（Task 8 修正 B 所加，值不采用计划笔误 "tvgId"）；修正 C=设计 §3.3 首页入口补漏——ChannelAdapter 长按→跳 EPG（HomeActivity 仅 +8 行）。质量修补：item_epg 行 `focusable=true` + 数据到达后 `list.post { list.requestFocus() }`（首版整页无可聚焦控件，遥控器无法滚动，Critical）。
+- ✅ **Task 10 完成**：订阅管理+编辑（实现 `a598c57`，质量修补 `8b74f09`，22 测试全绿）。唯一编译偏差：SubsActivity `adapter` 显式标注 `: SubAdapter`（Kotlin 递归类型推断）。质量修补六项：①`ChannelDao.replaceFor`/`EpgDao.replaceAll` @Transaction（刷新写入原子化，取消不再"清了没写"，落实 §6）；②btnRefresh 防重标志；③选中行 isSelected=选中（不再误绑 isCurrent），★ 仍表当前订阅；④删除 AlertDialog 二次确认；⑤保存防重（saving/loaded 标志+add 成功回填 existing 切编辑态，三条重复落库路径封死）+`subscriptionById` 安全调用；⑥无 EPG 源订阅残留清理（update 清空 EPG/删除订阅后若全库无 EPG 源则 `epgs.clear()`，全局表无外键系 §4 有意设计，勿无条件清）。布局：按钮行包 HorizontalScrollView、etName 补 inputType。
 - **环境新增**：本机 fake-IP 系统代理（127.0.0.1:7893），Gradle JVM 不走系统代理导致新依赖解析超时——已在 `gradle.properties` 写入 `systemProp.http(s).proxy*` 4 行（换机器/关代理需删）。另：Write/Edit 工具会把 `"﻿"` 文本转成真实不可见字符，处理 BOM 须用 PowerShell 字节级写入并十六进制验证。
 - 环境要点：PowerShell 5.1 无 `&&`；**gradlew 调用须同行内联** `$env:JAVA_HOME='D:\app\bigtext\tools\jdk17';`（gradle.properties 的 java.home 已含，双保险）；分支 `feature/iptv-player`。
-- 执行方式：子代理驱动（implementer → spec review → quality review，逐任务），当前进行 Task 10。
+- 执行方式：子代理驱动（implementer → spec review → quality review，逐任务），当前进行 Task 11（收尾）。
 
 ---
 
@@ -2327,6 +2328,12 @@ Expected: 全绿。
 git add app/src
 git commit -m "[feat] 订阅管理与编辑：增删改、设为当前、保存时连通性测试"
 ```
+
+> **实现偏差说明（评审后修订，以代码为准）**：
+> 1. 编译必需：`private val adapter: SubAdapter by lazy {...}` 显式类型标注（lazy 块内自引用触发 Kotlin 递归推断报错）。
+> 2. 质量修补（`8b74f09`，评审 Important×6+Minor×2 全部处理，详见执行进度 Task 10 行）。新增 DAO 模式：`@Transaction` 接口默认方法做"清+写"原子替换——后续任何"替换整表/整订阅数据"的需求一律走此模式，勿再裸写 clear+insert。
+> 3. 设计不变量补注：`epg_programmes` 全局表"最后一次成功刷新覆盖全表"语义（§4）——多订阅共享一张 EPG 表是有意设计，各订阅 EPG 不隔离；新增"全库无 EPG 源则清表"防止残留误导。
+> 4. 有意不修（评审非阻断备注）：`catch (Exception)` 吞 CancellationException（与全工程同模式）；`existing` 跨 IO/主线程捕获变量（happens-before 成立）。
 
 ---
 
