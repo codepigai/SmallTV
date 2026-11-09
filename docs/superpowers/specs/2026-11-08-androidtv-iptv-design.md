@@ -66,9 +66,9 @@
 | 表 | 字段要点 | 说明 |
 |---|---|---|
 | `subscriptions` | id、名称、m3uUrl、epgUrl(可空)、isCurrent | 仅一条 isCurrent 为真 |
-| `channels` | id、subscriptionId、name、logoUrl、groupTitle、streamUrl、sortIndex | 解析 m3u 的缓存，按订阅隔离 |
+| `channels` | id、subscriptionId、name、logoUrl、groupTitle、streamUrl、tvgId、sortIndex | 解析 m3u 的缓存，按订阅隔离；tvgId 供 EPG 匹配 |
 | `favorites` | id、name、logoUrl、streamUrl、addedAt | 全局共享，不挂订阅外键，按 (name, streamUrl) 去重 |
-| `epg_programmes` | id、channelKey、title、description、startTime、endTime | 只存今天+明天；channelKey = tvg-id 优先，频道名兜底 |
+| `epg_programmes` | 复合主键 (channelKey, startTime, title)、description、endTime | 只存今天+明天；channelKey = tvg-id 优先，频道名兜底；一个节目多键→多行 |
 | `app_state` | key、value | 最后播放频道等简单状态 |
 
 ## 5. 关键流程

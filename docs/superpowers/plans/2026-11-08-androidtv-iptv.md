@@ -18,10 +18,11 @@
 - ✅ **Task 2 完成**：资源/完整 Manifest/5 占位 Activity（`a79a245`）；审查修补 `87e6a0d`（landscape 特性可选化、allowBackup=false、PlaybackActivity configChanges——Task 8 注意 manifest 已含 configChanges）。
 - ✅ **Task 3 完成**：M3uParser TDD（实现 `9f6558f`，审查修补 `bad2c6a`，9 测试全绿）。评审修正了计划参考代码：`tvg-logo=""`→null、空名逗号行 `ci >= 0`（防 URL 带逗号）、补 `tvg-name` 兜底、预编译正则、`tvg-id` 空→null、BOM 用 `"﻿"` 转义（实际提交代码为准，见 Task 3 节末备注）。
 - ✅ **Task 4 完成**：XmlTvParser+Match TDD（实现 `b3a33e0`，评审修补 `961a843` + 纠偏 `6dd80fc`，全套 22 测试全绿）。修正要点：`parseXmlTvTime` 透传 zone、小数秒（1–9 位，取前 3 位毫秒）、nowNext 删除不可达分支、channel id 统一 trim、**name 键顺序无关回填（`<channel>` 在 programme 前后均可，勿再"修正"为严格顺序）**。见 Task 4 节末备注。
-- **Task 6 注意（来自 Task 4 评审）**：EPG 写库避免 `list.flatMap{...}.chunked()` 二次物化（50k 节目≈10万+实体）；用 `asSequence().flatMap{...}.chunked(500)` 惰性流式写入。
+- ✅ **Task 5 完成**：Room 实体/DAO/Database + App.db（实现 `4b265d2`，评审补充 `ed0da4f`：`SubscriptionDao.setCurrentAtomically` @Transaction）。**Task 6 的 Repository 中设置当前订阅一律调 `setCurrentAtomically(id)`，勿手工 clear+set**。设计文档 §4 已同步（channels 含 tvgId、epg 复合主键）。
+- ✅ **Task 6 完成**：Fetcher+Repository（实现 `d0f4d9f`，评审修补 `7dd415c`）。关键契约：`Fetcher` **所有**失败路径只抛 `FetchException`（含响应体读取阶段；`withStream` 限域读取）；错误消息为中文（连接超时/DNS 解析失败/连接失败/服务器错误 $code，可直接进 Toast）；`setCurrentAtomically` 已接入；EPG 写入 `asSequence` 惰性 chunked。**UI（Task 7–10）约定：`catch (e: Exception)` 兜底（解析异常非 FetchException），`e is FetchException -> e.message` 展示原因**。
 - **环境新增**：本机 fake-IP 系统代理（127.0.0.1:7893），Gradle JVM 不走系统代理导致新依赖解析超时——已在 `gradle.properties` 写入 `systemProp.http(s).proxy*` 4 行（换机器/关代理需删）。另：Write/Edit 工具会把 `"﻿"` 文本转成真实不可见字符，处理 BOM 须用 PowerShell 字节级写入并十六进制验证。
 - 环境要点：PowerShell 5.1 无 `&&`；**gradlew 调用须同行内联** `$env:JAVA_HOME='D:\app\bigtext\tools\jdk17';`（gradle.properties 的 java.home 已含，双保险）；分支 `feature/iptv-player`。
-- 执行方式：子代理驱动（implementer → spec review → quality review，逐任务），当前进行 Task 5。
+- 执行方式：子代理驱动（implementer → spec review → quality review，逐任务），当前进行 Task 7。
 
 ---
 
@@ -952,6 +953,7 @@ import androidx.room.Delete
 import androidx.room.Insert
 import androidx.room.OnConflictStrategy
 import androidx.room.Query
+import androidx.room.Transaction
 import androidx.room.Update
 
 @Dao
@@ -964,6 +966,13 @@ interface SubscriptionDao {
     @Query("SELECT * FROM subscriptions WHERE isCurrent = 1 LIMIT 1") suspend fun current(): Subscription?
     @Query("UPDATE subscriptions SET isCurrent = 0") suspend fun clearCurrent()
     @Query("UPDATE subscriptions SET isCurrent = 1 WHERE id = :id") suspend fun setCurrent(id: Long)
+
+    /** 保证"仅一条 current"不变量的原子入口，调用方勿再手工 clear+set */
+    @Transaction
+    suspend fun setCurrentAtomically(id: Long) {
+        clearCurrent()
+        setCurrent(id)
+    }
 }
 
 @Dao
@@ -1291,6 +1300,8 @@ Expected: 全绿。
 git add app/src
 git commit -m "[feat] Fetcher 与 Repository：订阅/刷新/收藏/EPG 数据流"
 ```
+
+> **实现偏差说明（评审后修正，以提交 `d0f4d9f`+`7dd415c` 为准）**：① `addSubscription`/`setSubscriptionCurrent`/`deleteSubscription` 用 `setCurrentAtomically`（@Transaction）；② `refreshEpg` 惰性 `asSequence().flatMap{}.chunked(500)` + `fetcher.withStream(url){...}`；③ Fetcher 全程 FetchException 契约（含 body 读取）+ 中文错误消息（连接超时/DNS 解析失败/连接失败/服务器错误 N）+ `withStream` 限域读取。UI 侧：`catch (Exception)` 兜底，FetchException.message 直接展示。
 
 ---
 
