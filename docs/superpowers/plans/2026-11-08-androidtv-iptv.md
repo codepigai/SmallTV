@@ -17,9 +17,11 @@
 - ✅ **Task 1 完成**：脚手架+wrapper，空工程 assembleDebug 通过（`77ca0df` + `.gitattributes` 修复 `ab3483a`）。审查结论：机器专属路径（gradle.properties 的 java.home、wrapper file:// 源）为设计阶段确认的单机构建方案，有意保留。
 - ✅ **Task 2 完成**：资源/完整 Manifest/5 占位 Activity（`a79a245`）；审查修补 `87e6a0d`（landscape 特性可选化、allowBackup=false、PlaybackActivity configChanges——Task 8 注意 manifest 已含 configChanges）。
 - ✅ **Task 3 完成**：M3uParser TDD（实现 `9f6558f`，审查修补 `bad2c6a`，9 测试全绿）。评审修正了计划参考代码：`tvg-logo=""`→null、空名逗号行 `ci >= 0`（防 URL 带逗号）、补 `tvg-name` 兜底、预编译正则、`tvg-id` 空→null、BOM 用 `"﻿"` 转义（实际提交代码为准，见 Task 3 节末备注）。
+- ✅ **Task 4 完成**：XmlTvParser+Match TDD（实现 `b3a33e0`，评审修补 `961a843` + 纠偏 `6dd80fc`，全套 22 测试全绿）。修正要点：`parseXmlTvTime` 透传 zone、小数秒（1–9 位，取前 3 位毫秒）、nowNext 删除不可达分支、channel id 统一 trim、**name 键顺序无关回填（`<channel>` 在 programme 前后均可，勿再"修正"为严格顺序）**。见 Task 4 节末备注。
+- **Task 6 注意（来自 Task 4 评审）**：EPG 写库避免 `list.flatMap{...}.chunked()` 二次物化（50k 节目≈10万+实体）；用 `asSequence().flatMap{...}.chunked(500)` 惰性流式写入。
 - **环境新增**：本机 fake-IP 系统代理（127.0.0.1:7893），Gradle JVM 不走系统代理导致新依赖解析超时——已在 `gradle.properties` 写入 `systemProp.http(s).proxy*` 4 行（换机器/关代理需删）。另：Write/Edit 工具会把 `"﻿"` 文本转成真实不可见字符，处理 BOM 须用 PowerShell 字节级写入并十六进制验证。
 - 环境要点：PowerShell 5.1 无 `&&`；**gradlew 调用须同行内联** `$env:JAVA_HOME='D:\app\bigtext\tools\jdk17';`（gradle.properties 的 java.home 已含，双保险）；分支 `feature/iptv-player`。
-- 执行方式：子代理驱动（implementer → spec review → quality review，逐任务），当前进行 Task 4。
+- 执行方式：子代理驱动（implementer → spec review → quality review，逐任务），当前进行 Task 5。
 
 ---
 
@@ -876,6 +878,8 @@ Expected: 全部测试绿（M3uParserTest 7 + 本任务 10）。
 git add app/src
 git commit -m "[feat] XMLTV 流式解析器与匹配/收藏纯逻辑，含单测"
 ```
+
+> **实现偏差说明（评审后修正，以提交 `961a843`+`6dd80fc` 为准）**：① 死变量 `textFor` 删除；② `parseXmlTvTime(raw, zone)` 透传 zone（无时区时间戳按传入时区解释）；③ 时间戳支持小数秒 `(?:\.(\d{1,9}))?`，取前 3 位作毫秒；④ `nowNext` 删除不可达 fallback；⑤ `<channel id>` 与 programme `channel` 属性 trim 归一，`id:` 键与 displayNames 查找一致；⑥ name 键为解析结束后统一回填，**与 `<channel>` 定义位置无关**（勿改成顺序敏感）；⑦ 新增 3 例：窗口起点跨界保留、先 programme 后 channel 仍有双键、小数秒解析。本任务 MatchTest 6 + XmlTvParserTest 7 = 13 例，全套 22 例全绿。
 
 ---
 
