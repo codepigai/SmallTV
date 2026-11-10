@@ -7,6 +7,7 @@ import android.os.Looper
 import android.os.SystemClock
 import android.util.TypedValue
 import android.view.Gravity
+import android.view.KeyEvent
 import android.view.View
 import android.view.ViewGroup
 import android.widget.FrameLayout
@@ -14,6 +15,7 @@ import android.widget.LinearLayout
 import android.widget.TextView
 import androidx.appcompat.app.AppCompatActivity
 import androidx.core.content.ContextCompat
+import androidx.lifecycle.lifecycleScope
 import androidx.media3.common.AudioAttributes
 import androidx.media3.common.MediaItem
 import androidx.media3.common.PlaybackException
@@ -65,6 +67,8 @@ class MultiScreenActivity : AppCompatActivity() {
 
     private lateinit var gridContainer: FrameLayout
     private lateinit var pickerOverlay: View
+    private lateinit var drawer: ChannelDrawer
+    private var drawerTarget: Cell? = null
     private lateinit var modeText: TextView
     private lateinit var selText: TextView
     private lateinit var audioText: TextView
@@ -77,9 +81,36 @@ class MultiScreenActivity : AppCompatActivity() {
         modeText = findViewById(R.id.multiModeText)
         selText = findViewById(R.id.multiSelText)
         audioText = findViewById(R.id.multiAudioText)
+        drawer = ChannelDrawer(findViewById(android.R.id.content), repo, lifecycleScope)
         // 布局选择层每次进入都弹（spec §3.2）；点击接 buildGrid 在键位任务接线
         pickerOverlay.visibility = View.VISIBLE
         findViewById<View>(R.id.pickerTwo).requestFocus()
+    }
+
+    /** 对选中格开抽屉换台/选台；开着则先收再开（post 串行滑移动画） */
+    private fun openDrawerFor(cell: Cell) {
+        drawerTarget = cell
+        val show = {
+            drawer.show(cell.row?.url) { row ->
+                drawerTarget?.let { t ->
+                    playInCell(t, row)
+                    setAudioOwner(t.index)   // 声音自动切给最后选台的格（spec §3.4）
+                    drawer.hide()
+                    t.root.requestFocus()    // 焦点回格（Review Focus #3）
+                }
+            }
+        }
+        if (drawer.isOpen) { drawer.hide(); gridContainer.post { show() } } else show()
+    }
+
+    override fun onKeyDown(keyCode: Int, event: KeyEvent?): Boolean {
+        // Task 4 最小通路：格有焦点且无面板时按确定开抽屉；完整键位分发在键位任务
+        if ((keyCode == KeyEvent.KEYCODE_DPAD_CENTER || keyCode == KeyEvent.KEYCODE_ENTER) &&
+            event?.repeatCount == 0 && !drawer.isOpen && pickerOverlay.visibility != View.VISIBLE
+        ) {
+            cells.firstOrNull { it.root.hasFocus() }?.let { openDrawerFor(it); return true }
+        }
+        return super.onKeyDown(keyCode, event)
     }
 
     // —— 网格构建 ——
