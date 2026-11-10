@@ -59,13 +59,13 @@ class ChannelDrawer(root: View, private val repo: Repository, private val scope:
         load(currentUrl)
     }
 
-    /** 收起抽屉；未打开返回 false（供 BACK 键判断是否消费）。 */
-    fun hide(): Boolean {
+    /** 收起抽屉；未打开返回 false（供 BACK 键判断是否消费）。afterClose 在滑出动画正常结束时执行（换格重开用，终审 #4）。 */
+    fun hide(afterClose: (() -> Unit)? = null): Boolean {
         if (!isOpen) return false
         isOpen = false
         panel.animate().translationX(panel.width.toFloat())
             .setDuration(200)
-            .withEndAction { panel.visibility = View.GONE; panel.translationX = 0f }
+            .withEndAction { panel.visibility = View.GONE; panel.translationX = 0f; afterClose?.invoke() }
             .start()
         return true
     }

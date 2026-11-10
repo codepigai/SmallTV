@@ -29,6 +29,7 @@ import androidx.media3.ui.PlayerView
 import com.smallpig.iptv.App
 import com.smallpig.iptv.R
 import com.smallpig.iptv.net.IptvLoadPolicy
+import kotlinx.coroutines.launch
 
 /**
  * 多屏观看（spec 2026-11-11）：2/4 格并发直播、逐格换台、单路声音、长按 BACK 退出。
@@ -55,6 +56,8 @@ class MultiScreenActivity : AppCompatActivity() {
         var player: ExoPlayer? = null
         var row: PickRow? = null
         var reconnects = 0L
+        var pendingStart = false    // stopped 期间到达的起播请求，回 onStart 重投（终审 #1）
+        var needsReconnect = false  // stopped 时撤销的重连定时器，回前台续联
         lateinit var reconnect: Runnable   // createCell 里绑定 Runnable { doReconnect(cell) }
     }
 
@@ -65,6 +68,7 @@ class MultiScreenActivity : AppCompatActivity() {
     private val cells = mutableListOf<Cell>()
     private var mode = 0
     private var selected = -1
+    private var started = false   // onStart..onStop 之间才允许起播/续播（终审 #1）
 
     private lateinit var gridContainer: FrameLayout
     private lateinit var pickerOverlay: View
@@ -74,10 +78,12 @@ class MultiScreenActivity : AppCompatActivity() {
     private lateinit var selText: TextView
     private lateinit var audioText: TextView
 
-    // BACK 长按（spec §4：短按=逐层收起，≥700ms=退出；400ms 起亮提示）
+    // BACK 分层（spec §4：短按=逐层收起，≥700ms=退出；400ms 起亮提示）。
+    // 长短按以事件时间差（UP.eventTime - DOWN.downTime）在 UP 裁决，不用墙钟定时器判退出——
+    // 主线程被 4 路起播占用时定时器可能先于排队中的 UP 触发，把 300ms 短按误判成退出（终审 #3，违反 §2 反目标）。
     private var backPending = false
+    private var backDownAt = 0L
     private val backHint = Runnable { Toast.makeText(this, "继续按住退出多屏", Toast.LENGTH_SHORT).show() }
-    private val backExit = Runnable { if (!isFinishing) finish() }
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -99,6 +105,14 @@ class MultiScreenActivity : AppCompatActivity() {
         buildGrid(n)
         pickerOverlay.visibility = View.GONE
         cells.firstOrNull()?.root?.requestFocus()   // 首焦进 1 格
+        // 无订阅时空格文案改指引（Review Focus #6 格内侧，终审 #5；抽屉侧 ChannelDrawer.load 已有）
+        lifecycleScope.launch {
+            if (repo.currentSubscription() != null) return@launch
+            cells.forEach { c ->
+                c.statusText.text = "暂无订阅：请到『订阅管理』添加"
+                c.statusText.visibility = View.VISIBLE
+            }
+        }
     }
 
     /** 对选中格开抽屉换台/选台；开着则先收再开（post 串行滑移动画） */
@@ -114,16 +128,15 @@ class MultiScreenActivity : AppCompatActivity() {
                 }
             }
         }
-        if (drawer.isOpen) { drawer.hide(); gridContainer.post { show() } } else show()
+        if (drawer.isOpen) drawer.hide { show() } else show()   // 收起动画结束再重开，无 post 竞态（终审 #4）
     }
 
     override fun onKeyDown(keyCode: Int, event: KeyEvent?): Boolean {
-        // BACK：DOWN 起 400ms 提示/700ms 退出双计时器，短长按在 UP 裁决（Review Focus #2）
         if (keyCode == KeyEvent.KEYCODE_BACK) {
             if (event?.repeatCount == 0) {
                 backPending = true
+                backDownAt = event?.downTime?.takeIf { it > 0 } ?: SystemClock.uptimeMillis()
                 handler.postDelayed(backHint, 400)
-                handler.postDelayed(backExit, 700)
             }
             return true   // 系统默认 BACK 永不可达
         }
@@ -153,10 +166,15 @@ class MultiScreenActivity : AppCompatActivity() {
             if (backPending) {
                 backPending = false
                 handler.removeCallbacks(backHint)
-                handler.removeCallbacks(backExit)
-                if (!isFinishing) {   // <700ms：逐层收起——抽屉 → 提示（spec §3.7）
-                    if (!drawer.hide()) {
-                        Toast.makeText(this, "长按返回键退出多屏", Toast.LENGTH_SHORT).show()
+                if (!isFinishing) {
+                    val downAt = event?.downTime?.takeIf { it > 0 } ?: backDownAt
+                    val heldMs = (event?.eventTime ?: SystemClock.uptimeMillis()) - downAt
+                    when {
+                        heldMs >= 700 -> finish()   // 长按退出（松手触发：短按绝不误退优先于「按住瞬间退」）
+                        !drawer.hide() ->            // 短按逐层收起：抽屉 → 提示（spec §3.7）
+                            Toast.makeText(this, "长按返回键退出多屏", Toast.LENGTH_SHORT).show()
+                        else ->                      // 收抽屉后焦点必须回格，否则确定键变哑（终审 #2，Review Focus #3）
+                            cells.firstOrNull { it.index == selected }?.root?.requestFocus()
                     }
                 }
             }
@@ -303,6 +321,7 @@ class MultiScreenActivity : AppCompatActivity() {
         val url = row.url
         gate.request {
             if (isFinishing || isDestroyed || cell.player !== p) return@request   // 槽位到达时格已释放/换机
+            if (!started) { cell.pendingStart = true; return@request }             // stopped 期间不拉流（终审 #1）
             p.setMediaItem(MediaItem.fromUri(url))
             p.prepare()
             p.playWhenReady = true
@@ -358,12 +377,33 @@ class MultiScreenActivity : AppCompatActivity() {
 
     override fun onStart() {
         super.onStart()
-        cells.forEach { c -> if (c.row != null) c.player?.playWhenReady = true }
+        started = true
+        cells.forEach { c ->
+            if (c.needsReconnect) {
+                c.needsReconnect = false
+                handler.postDelayed(c.reconnect, 1000)   // 回前台 1s 后续联（重连额度保留）
+            }
+            if (c.pendingStart) {
+                c.pendingStart = false
+                c.row?.let { playInCell(c, it) }         // stopped 期间到达的起播请求重投 gate
+            } else if (c.row != null) {
+                c.player?.playWhenReady = true
+            }
+        }
     }
 
     override fun onStop() {
         super.onStop()
-        cells.forEach { c -> c.player?.playWhenReady = false }
+        started = false
+        cells.forEach { c ->
+            c.player?.playWhenReady = false
+            // Handler.hasCallbacks 是 API 28，minSdk 23 用额度推断：reconnects>0 且未恢复 = 重连在途
+            // （恢复时 onCellRecovered 把 reconnects 归零；误判多一次 prepare 无害）
+            if (c.player != null && c.row != null && c.reconnects > 0L) {
+                handler.removeCallbacks(c.reconnect)     // 不在后台烧源/烧额度（终审 #1，spec §2 反目标）
+                c.needsReconnect = true
+            }
+        }
     }
 
     override fun onDestroy() {
