@@ -11,6 +11,7 @@
             <TextView android:id="@+id/tabAll" style="@style/TabBtn" android:text="全部频道" android:nextFocusDown="@+id/groupList" />
             <TextView android:id="@+id/tabFav" style="@style/TabBtn" android:text="收藏夹" android:nextFocusDown="@+id/favList" />
             <TextView android:id="@+id/tabSubs" style="@style/TabBtn" android:text="订阅管理" />
+            <TextView android:id="@+id/tabMulti" style="@style/TabBtn" android:text="多屏观看" />
         </LinearLayout>
 
         <FrameLayout android:layout_width="match_parent" android:layout_height="0dp" android:layout_weight="1"
