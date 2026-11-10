@@ -5,3 +5,6 @@ local.properties
 .idea
 *.iml
 .kotlin
+# release 签名凭据，勿入库（备份说明见 docs/RELEASE.md）
+keystore/
+keystore.properties
