@@ -13,6 +13,7 @@ import android.view.ViewGroup
 import android.widget.FrameLayout
 import android.widget.LinearLayout
 import android.widget.TextView
+import android.widget.Toast
 import androidx.appcompat.app.AppCompatActivity
 import androidx.core.content.ContextCompat
 import androidx.lifecycle.lifecycleScope
@@ -73,6 +74,11 @@ class MultiScreenActivity : AppCompatActivity() {
     private lateinit var selText: TextView
     private lateinit var audioText: TextView
 
+    // BACK 长按（spec §4：短按=逐层收起，≥700ms=退出；400ms 起亮提示）
+    private var backPending = false
+    private val backHint = Runnable { Toast.makeText(this, "继续按住退出多屏", Toast.LENGTH_SHORT).show() }
+    private val backExit = Runnable { if (!isFinishing) finish() }
+
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         setContentView(R.layout.activity_multi_screen)
@@ -82,9 +88,17 @@ class MultiScreenActivity : AppCompatActivity() {
         selText = findViewById(R.id.multiSelText)
         audioText = findViewById(R.id.multiAudioText)
         drawer = ChannelDrawer(findViewById(android.R.id.content), repo, lifecycleScope)
-        // 布局选择层每次进入都弹（spec §3.2）；点击接 buildGrid 在键位任务接线
+        // 布局选择层每次进入都弹（spec §3.2）；选完即切分，播放中不可换布局（§13①）
+        findViewById<View>(R.id.pickerTwo).setOnClickListener { pickLayout(2) }
+        findViewById<View>(R.id.pickerFour).setOnClickListener { pickLayout(4) }
         pickerOverlay.visibility = View.VISIBLE
         findViewById<View>(R.id.pickerTwo).requestFocus()
+    }
+
+    private fun pickLayout(n: Int) {
+        buildGrid(n)
+        pickerOverlay.visibility = View.GONE
+        cells.firstOrNull()?.root?.requestFocus()   // 首焦进 1 格
     }
 
     /** 对选中格开抽屉换台/选台；开着则先收再开（post 串行滑移动画） */
@@ -104,13 +118,51 @@ class MultiScreenActivity : AppCompatActivity() {
     }
 
     override fun onKeyDown(keyCode: Int, event: KeyEvent?): Boolean {
-        // Task 4 最小通路：格有焦点且无面板时按确定开抽屉；完整键位分发在键位任务
-        if ((keyCode == KeyEvent.KEYCODE_DPAD_CENTER || keyCode == KeyEvent.KEYCODE_ENTER) &&
-            event?.repeatCount == 0 && !drawer.isOpen && pickerOverlay.visibility != View.VISIBLE
-        ) {
-            cells.firstOrNull { it.root.hasFocus() }?.let { openDrawerFor(it); return true }
+        // BACK：DOWN 起 400ms 提示/700ms 退出双计时器，短长按在 UP 裁决（Review Focus #2）
+        if (keyCode == KeyEvent.KEYCODE_BACK) {
+            if (event?.repeatCount == 0) {
+                backPending = true
+                handler.postDelayed(backHint, 400)
+                handler.postDelayed(backExit, 700)
+            }
+            return true   // 系统默认 BACK 永不可达
+        }
+        if (event?.repeatCount != 0) return super.onKeyDown(keyCode, event)
+        when (keyCode) {
+            KeyEvent.KEYCODE_MENU -> {   // 声音切到选中格（spec §4/§7）
+                if (pickerOverlay.visibility == View.VISIBLE) return true
+                val row = cells.firstOrNull { it.index == selected }?.row
+                if (row == null) Toast.makeText(this, "本格还没有频道", Toast.LENGTH_SHORT).show()
+                else {
+                    setAudioOwner(selected)
+                    Toast.makeText(this, "声音已切到 ${row.name}", Toast.LENGTH_SHORT).show()
+                }
+                return true
+            }
+            KeyEvent.KEYCODE_DPAD_CENTER, KeyEvent.KEYCODE_ENTER -> {   // 确定：对选中格开抽屉（overlay/抽屉开着时不截）
+                if (!drawer.isOpen && pickerOverlay.visibility != View.VISIBLE) {
+                    cells.firstOrNull { it.root.hasFocus() }?.let { openDrawerFor(it); return true }
+                }
+            }
         }
         return super.onKeyDown(keyCode, event)
+    }
+
+    override fun onKeyUp(keyCode: Int, event: KeyEvent?): Boolean {
+        if (keyCode == KeyEvent.KEYCODE_BACK) {
+            if (backPending) {
+                backPending = false
+                handler.removeCallbacks(backHint)
+                handler.removeCallbacks(backExit)
+                if (!isFinishing) {   // <700ms：逐层收起——抽屉 → 提示（spec §3.7）
+                    if (!drawer.hide()) {
+                        Toast.makeText(this, "长按返回键退出多屏", Toast.LENGTH_SHORT).show()
+                    }
+                }
+            }
+            return true   // 与 DOWN 成对消费
+        }
+        return super.onKeyUp(keyCode, event)
     }
 
     // —— 网格构建 ——
@@ -119,9 +171,11 @@ class MultiScreenActivity : AppCompatActivity() {
 
     private fun createCell(index: Int): Cell {
         val root = FrameLayout(this).apply {
+            id = View.generateViewId()
             setBackgroundColor(Color.BLACK)
             foreground = ContextCompat.getDrawable(context, R.drawable.cell_focus_frame)
             isFocusable = true
+            setOnFocusChangeListener { _, has -> if (has) selectCell(index) }
         }
         val pv = PlayerView(this).apply {
             setUseController(false)   // 多格禁内置控制器（同单屏真机反馈 #3）
@@ -182,7 +236,32 @@ class MultiScreenActivity : AppCompatActivity() {
             }
             gridContainer.addView(col)
         }
+        linkGridNavigation()
         modeText.text = "多屏 ${mode}路"
+    }
+
+    /** 格间方向键绕回（spec §4）：2 屏左右互指；4 屏田字上下左右互指 */
+    private fun linkGridNavigation() {
+        val ids = cells.map { it.root.id }
+        fun link(i: Int, l: Int, r: Int, u: Int, d: Int) = with(cells[i].root) {
+            nextFocusLeftId = l; nextFocusRightId = r; nextFocusUpId = u; nextFocusDownId = d
+        }
+        if (mode == 2) {
+            link(0, ids[1], ids[1], View.NO_ID, View.NO_ID)
+            link(1, ids[0], ids[0], View.NO_ID, View.NO_ID)
+        } else {
+            link(0, ids[1], ids[1], ids[2], ids[2])
+            link(1, ids[0], ids[0], ids[3], ids[3])
+            link(2, ids[3], ids[3], ids[0], ids[0])
+            link(3, ids[2], ids[2], ids[1], ids[1])
+        }
+    }
+
+    /** 焦点所在即选中格：描边白框 + 信息条联动（spec §5） */
+    private fun selectCell(index: Int) {
+        selected = index
+        cells.forEach { it.root.isSelected = it.index == index }
+        selText.text = "选中：" + (cells.firstOrNull { it.index == index }?.row?.name ?: "空")
     }
 
     // —— 播放器与三层防护 ——
@@ -218,6 +297,7 @@ class MultiScreenActivity : AppCompatActivity() {
         cell.reconnects = 0
         cell.row = row
         cell.nameLabel.text = row.name
+        if (cell.index == selected) selectCell(cell.index)   // 信息条「选中」跟随换台
         setStatus(cell, "起播中…")
         val p = cell.player!!
         val url = row.url
