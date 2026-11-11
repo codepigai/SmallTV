@@ -10,6 +10,14 @@
 
 **Spec:** `docs/superpowers/specs/2026-11-11-multiscreen-design.md`（构建者评审已闭环，本计划逐节对应）
 
+## 执行记录（2026-11-11）
+
+- **完成日期**：2026-11-11。分支 `feature/multiscreen`（6dd2713..3f391ac），inline 执行 Task 1–5 各带单测；全量 39/39 绿。
+- **终审**：opus 全分支评审 0 Critical / 6 Important / 11 Minor；修复轮 5 修（生命周期起播门控、BACK 焦点回格、BACK 事件时间裁决、抽屉重开竞态、无订阅格内文案）+1 裁决（4 路播放器主线程内核暂不动，列装机观测项）。Minor 11 条留档见 ledger（已随收尾删除，摘要在合并说明）。
+- **验收（用户真机实测）**：功能基本可用。已知项：央视频系频道多路时卡顿——源侧问题，用户裁决 App 不处理。
+- **版本号**：开发中擅自 bump 已按用户规则回退（升 versionCode/versionName 必须用户确认后执行）。
+- **后续需求**：跨订阅同屏 → 用户选定方案 A（抽屉顶部订阅切换），另立分支实施。
+
 ## Global Constraints
 
 - 不新增任何依赖；minSdk 23 / target 34 / compileSdk 34 不动；`PlaybackActivity`、`Repository`、`net/*`、单屏键位零改动（spec §9「不动」清单）。
