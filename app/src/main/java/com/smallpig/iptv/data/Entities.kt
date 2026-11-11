@@ -11,6 +11,7 @@ data class Subscription(
     val m3uUrl: String,
     val epgUrl: String? = null,
     val isCurrent: Boolean = false,
+    val lastUpdatedAt: Long = 0, // 最近一次全量拉频道成功时刻（0=从未，历史行迁移默认 0）
 )
 
 @Entity(tableName = "channels")
