@@ -2,6 +2,7 @@ package com.smallpig.iptv.ui
 
 import com.smallpig.iptv.data.Channel
 import com.smallpig.iptv.data.Favorite
+import com.smallpig.iptv.data.Subscription
 import com.smallpig.iptv.parse.FavoriteKey
 
 /**
@@ -94,3 +95,10 @@ class AudioRouter {
         for ((i, set) in volumes) set(if (i == owner) 1f else 0f)
     }
 }
+
+/**
+ * 抽屉订阅切换（方案 A 跨订阅同屏）的选取顺序：指定 → 当前 → 第一个；空表 null。
+ * 指定订阅已被删除时自动回退当前订阅（ChannelDrawer 记忆 subId 不校验存活）。
+ */
+fun pickSubscription(subs: List<Subscription>, selectedId: Long?): Subscription? =
+    subs.firstOrNull { it.id == selectedId } ?: subs.firstOrNull { it.isCurrent } ?: subs.firstOrNull()

@@ -2,9 +2,11 @@ package com.smallpig.iptv
 
 import com.smallpig.iptv.data.Channel
 import com.smallpig.iptv.data.Favorite
+import com.smallpig.iptv.data.Subscription
 import com.smallpig.iptv.parse.FavoriteKey
 import com.smallpig.iptv.ui.AudioRouter
 import com.smallpig.iptv.ui.GROUP_FAV
+import com.smallpig.iptv.ui.pickSubscription
 import com.smallpig.iptv.ui.PickRow
 import com.smallpig.iptv.ui.StartGate
 import com.smallpig.iptv.ui.backoffMs
@@ -14,6 +16,7 @@ import com.smallpig.iptv.ui.favoritesToRows
 import com.smallpig.iptv.ui.filterRows
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
+import org.junit.Assert.assertNull
 import org.junit.Test
 
 /** 多屏纯逻辑（错峰门控/音量路由/重连退避/抽屉数据）——spec 2026-11-11 §6/§7/§3 */
@@ -141,5 +144,20 @@ class MultiScreenLogicTest {
         assertEquals(2, filterRows(rows, null, favRows).size)          // 全部
         assertEquals(listOf("A"), filterRows(rows, "体育", favRows).map { it.name })
         assertEquals(listOf("F"), filterRows(rows, GROUP_FAV, favRows).map { it.name })
+    }
+
+    // ---- pickSubscription：抽屉订阅切换的选取顺序（方案 A：指定→当前→第一个） ----
+
+    @Test
+    fun pickSubscription_selectedThenCurrentThenFirst() {
+        val a = Subscription(1, "a", "http://a.m3u")
+        val b = Subscription(2, "b", "http://b.m3u", isCurrent = true)
+        val c = Subscription(3, "c", "http://c.m3u")
+        val subs = listOf(a, b, c)
+        assertEquals(3L, pickSubscription(subs, 3L)?.id)      // 指定订阅优先（跨订阅同屏入口）
+        assertEquals(2L, pickSubscription(subs, null)?.id)    // 未指定 → 当前订阅
+        assertEquals(2L, pickSubscription(subs, 99L)?.id)     // 指定已删 → 回退当前
+        assertEquals(1L, pickSubscription(listOf(a, c), null)?.id)   // 无当前 → 第一个
+        assertNull(pickSubscription(emptyList(), null))       // 空 → null（无订阅空态）
     }
 }

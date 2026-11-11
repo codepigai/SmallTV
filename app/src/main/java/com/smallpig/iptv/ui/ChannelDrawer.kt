@@ -1,14 +1,17 @@
 package com.smallpig.iptv.ui
 
+import android.graphics.Color
 import android.view.LayoutInflater
 import android.view.View
 import android.view.ViewGroup
+import android.widget.LinearLayout
 import android.widget.TextView
 import androidx.lifecycle.LifecycleCoroutineScope
 import androidx.recyclerview.widget.LinearLayoutManager
 import androidx.recyclerview.widget.RecyclerView
 import com.smallpig.iptv.R
 import com.smallpig.iptv.data.Repository
+import com.smallpig.iptv.data.Subscription
 import kotlinx.coroutines.launch
 
 /**
@@ -18,13 +21,16 @@ import kotlinx.coroutines.launch
 class ChannelDrawer(root: View, private val repo: Repository, private val scope: LifecycleCoroutineScope) {
     private val panel: View = root.findViewById(R.id.drawerPanel)
     private val title: TextView = root.findViewById(R.id.drawerTitle)
+    private val subRow: LinearLayout = root.findViewById(R.id.drawerSubRow)
     private val groupList: RecyclerView = root.findViewById(R.id.drawerGroupList)
     private val channelList: RecyclerView = root.findViewById(R.id.drawerChannelList)
+    private val density = root.context.resources.displayMetrics.density
 
     private var allRows: List<PickRow> = emptyList()
     private var favRows: List<PickRow> = emptyList()
     private var currentGroup: String? = null
     private var pickCallback: ((PickRow) -> Unit)? = null
+    private var subId: Long? = null   // 抽屉切换行选中的订阅（null=当前订阅；跨订阅同屏方案 A）
 
     var isOpen = false
         private set
@@ -70,9 +76,32 @@ class ChannelDrawer(root: View, private val repo: Repository, private val scope:
         return true
     }
 
+    /** 订阅切换 chips（仅 ≥2 订阅时显示）；点击即在抽屉内换订阅重载列表（跨订阅同屏方案 A） */
+    private fun buildSubChips(subs: List<Subscription>, currentUrl: String?) {
+        val chosen = pickSubscription(subs, subId)?.id
+        subRow.removeAllViews()
+        for (s in subs) {
+            val sel = s.id == chosen
+            val chip = TextView(subRow.context).apply {
+                text = s.name
+                textSize = 13f
+                setTextColor(if (sel) Color.WHITE else 0xFF8899BB.toInt())
+                setBackgroundColor(if (sel) 0x33FFFFFF else Color.TRANSPARENT)
+                setPadding((8 * density).toInt(), (4 * density).toInt(), (8 * density).toInt(), (4 * density).toInt())
+                isFocusable = true
+                setOnClickListener { subId = s.id; load(currentUrl) }
+            }
+            subRow.addView(chip, LinearLayout.LayoutParams(ViewGroup.LayoutParams.WRAP_CONTENT, ViewGroup.LayoutParams.WRAP_CONTENT).apply {
+                marginEnd = (8 * density).toInt()
+            })
+        }
+    }
+
     private fun load(currentUrl: String?) {
         scope.launch {
-            val sub = repo.currentSubscription()
+            val subs = repo.subscriptions()
+            if (subs.size > 1) { subRow.visibility = View.VISIBLE; buildSubChips(subs, currentUrl) } else subRow.visibility = View.GONE
+            val sub = pickSubscription(subs, subId)
             if (sub == null) {   // 无订阅空态（Review Focus #6）
                 title.text = "暂无订阅：请到『订阅管理』添加"
                 allRows = emptyList(); favRows = emptyList()
