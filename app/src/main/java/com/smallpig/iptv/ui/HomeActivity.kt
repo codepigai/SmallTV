@@ -14,6 +14,7 @@ import android.widget.TextView
 import android.widget.Toast
 import androidx.appcompat.app.AppCompatActivity
 import androidx.lifecycle.lifecycleScope
+import androidx.recyclerview.widget.GridLayoutManager
 import androidx.recyclerview.widget.LinearLayoutManager
 import androidx.recyclerview.widget.RecyclerView
 import com.bumptech.glide.Glide
@@ -30,6 +31,7 @@ import kotlinx.coroutines.launch
 
 class HomeActivity : AppCompatActivity() {
     private val repo get() = (application as App).repo
+    private val uiSettings by lazy { UiSettings(this) }
 
     private lateinit var panelBrowse: View
     private lateinit var statusBar: TextView
@@ -85,13 +87,27 @@ class HomeActivity : AppCompatActivity() {
         channelList.layoutManager = LinearLayoutManager(this); channelList.adapter = channelAdapter
         favList.layoutManager = LinearLayoutManager(this); favList.adapter = favAdapter
         epgPanel = EpgPanel(findViewById(android.R.id.content), repo, lifecycleScope)
+        applyDisplayMode()
         showTab(0)
         findViewById<View>(R.id.tabAll).requestFocus()
     }
 
     override fun onResume() {
         super.onResume()
+        applyDisplayMode() // 设置页改过显示方式则回首页立即重设（spec §⑤生效方式）
         lifecycleScope.launch { reload() }
+    }
+
+    /** 列表⇄画廊：换 layoutManager + adapter 布局开关；favList 不受影响（收藏恒列表，裁决3） */
+    private fun applyDisplayMode() {
+        val grid = uiSettings.mode == MODE_GRID
+        channelList.layoutManager = if (grid) GridLayoutManager(this, uiSettings.span) else LinearLayoutManager(this)
+        if (channelAdapter.grid != grid) {
+            channelAdapter.grid = grid
+            // 计划写 notifyItemRangeChanged，但换布局必须重建 ViewHolder（rebind 不换 item 视图），故用 notifyDataSetChanged；
+            // 焦点由随后 reload() 的 restoreListFocus 恢复（Review Focus 3）
+            channelAdapter.notifyDataSetChanged()
+        }
     }
 
     private fun showTab(idx: Int) {
@@ -242,6 +258,7 @@ private class ChannelAdapter(
 ) : RecyclerView.Adapter<ChannelAdapter.VH>() {
     private var items: List<Channel> = emptyList()
     private val rttByUrl = HashMap<String, Long>()
+    var grid = false // 画廊宫格开关（item_channel_grid 布局；收藏列表恒 false 不受影响）
     fun submit(list: List<Channel>) { if (items == list) return; items = list; notifyDataSetChanged() }
     /** EPG 数据变化用 payload 原地重绑，保住当前焦点行 */
     fun refreshEpgLabels() { if (items.isNotEmpty()) notifyItemRangeChanged(0, items.size, "epg") }
@@ -257,7 +274,8 @@ private class ChannelAdapter(
         val fav: TextView = v.findViewById(R.id.chFav)
     }
     override fun onCreateViewHolder(parent: ViewGroup, viewType: Int) =
-        VH(LayoutInflater.from(parent.context).inflate(R.layout.item_channel, parent, false))
+        VH(LayoutInflater.from(parent.context).inflate(
+            if (grid) R.layout.item_channel_grid else R.layout.item_channel, parent, false))
     override fun getItemCount() = items.size
     override fun onBindViewHolder(h: VH, pos: Int) {
         val c = items[pos]
@@ -270,10 +288,12 @@ private class ChannelAdapter(
         h.itemView.setOnFocusChangeListener { _, has -> onFocus(if (has) c else null) }
         val rttMs = rttByUrl[c.streamUrl]
         h.now.text = applyGreen(nowLabel(null, rttMs))
-        scope.launch {
-            val t = epgFor(c)
-            if (h.bindingAdapterPosition == pos) {
-                h.now.text = applyGreen(nowLabel(t, rttMs))
+        if (!grid) { // 宫格卡不显示节目名：省掉逐格 epgFor 挂起查询
+            scope.launch {
+                val t = epgFor(c)
+                if (h.bindingAdapterPosition == pos) {
+                    h.now.text = applyGreen(nowLabel(t, rttMs))
+                }
             }
         }
     }
