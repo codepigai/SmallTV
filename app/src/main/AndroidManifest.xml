@@ -23,6 +23,7 @@
             </intent-filter>
         </activity>
         <activity android:name=".ui.PlaybackActivity" android:screenOrientation="landscape" android:configChanges="keyboardHidden|screenSize|screenLayout|smallestScreenSize|orientation|navigation" />
+        <activity android:name=".ui.MultiScreenActivity" android:screenOrientation="landscape" android:configChanges="keyboardHidden|screenSize|screenLayout|smallestScreenSize|orientation|navigation" />
         <activity android:name=".ui.SubsActivity" android:screenOrientation="landscape" />
         <activity android:name=".ui.SubEditActivity" android:screenOrientation="landscape" />
     </application>

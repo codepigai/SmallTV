@@ -1,0 +1,18 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- 选中格白色描边（spec §5）；未选中同宽透明描边占位防抖 -->
+<selector xmlns:android="http://schemas.android.com/apk/res/android">
+    <item android:state_selected="true">
+        <shape>
+            <solid android:color="#00000000" />
+            <stroke android:width="2dp" android:color="#FFFFFF" />
+            <corners android:radius="0dp" />
+        </shape>
+    </item>
+    <item>
+        <shape>
+            <solid android:color="#00000000" />
+            <stroke android:width="2dp" android:color="#00000000" />
+            <corners android:radius="0dp" />
+        </shape>
+    </item>
+</selector>
