@@ -12,6 +12,14 @@
     <TextView android:id="@+id/drawerTitle"
         android:layout_width="match_parent" android:layout_height="wrap_content"
         android:textColor="#FFFFFF" android:textSize="18sp" android:layout_marginBottom="12dp" />
+    <!-- 订阅切换行（方案 A：跨订阅同屏）：仅当存在 ≥2 订阅时由 ChannelDrawer 置 VISIBLE -->
+    <HorizontalScrollView android:id="@+id/drawerSubScroll"
+        android:layout_width="match_parent" android:layout_height="wrap_content"
+        android:layout_marginBottom="10dp" android:scrollbars="none" android:visibility="gone">
+        <LinearLayout android:id="@+id/drawerSubRow"
+            android:layout_width="wrap_content" android:layout_height="wrap_content"
+            android:orientation="horizontal" />
+    </HorizontalScrollView>
     <LinearLayout android:layout_width="match_parent" android:layout_height="0dp" android:layout_weight="1"
         android:orientation="horizontal">
         <androidx.recyclerview.widget.RecyclerView android:id="@+id/drawerGroupList"

@@ -107,7 +107,7 @@ class MultiScreenActivity : AppCompatActivity() {
         cells.firstOrNull()?.root?.requestFocus()   // 首焦进 1 格
         // 无订阅时空格文案改指引（Review Focus #6 格内侧，终审 #5；抽屉侧 ChannelDrawer.load 已有）
         lifecycleScope.launch {
-            if (repo.currentSubscription() != null) return@launch
+            if (repo.subscriptions().isNotEmpty()) return@launch   // 判空用订阅表（与抽屉 pickSubscription 的兜底一致）
             cells.forEach { c ->
                 c.statusText.text = "暂无订阅：请到『订阅管理』添加"
                 c.statusText.visibility = View.VISIBLE
