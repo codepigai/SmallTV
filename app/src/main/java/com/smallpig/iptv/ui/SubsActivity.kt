@@ -84,8 +84,9 @@ class SubsActivity : AppCompatActivity() {
         val all = repo.subscriptions()
         counts = all.associate { it.id to repo.channelCount(it.id) }
         adapter.submit(all, counts)
-        if (selected?.let { s -> all.none { it.id == s.id } } == true) selected = null
-        if (selected == null) selected = all.firstOrNull { it.isCurrent } ?: all.firstOrNull()
+        // 按 id 重解析为新实体：改名/刷新返回后右栏详情不得停留旧值（终审 I3）；
+        // 焦点行的 onSelect 会在重绑后再次触发并覆盖 selected，「焦点即选中」语义不受影响
+        selected = reselectSubs(all, selected)
         updateDetail()
     }
 
@@ -106,6 +107,10 @@ class SubsActivity : AppCompatActivity() {
 
     private fun toast(msg: String) = Toast.makeText(this, msg, Toast.LENGTH_SHORT).show()
 }
+
+/** reload 后按 id 重解析选中订阅：旧 id 消失退「当前」再退首个，空表 null（终审 I3，JVM 可测） */
+fun reselectSubs(all: List<Subscription>, prev: Subscription?): Subscription? =
+    all.firstOrNull { it.id == prev?.id } ?: all.firstOrNull { it.isCurrent } ?: all.firstOrNull()
 
 private class SubAdapter(val onSelect: (Subscription) -> Unit) : RecyclerView.Adapter<SubAdapter.VH>() {
     private var items: List<Subscription> = emptyList()

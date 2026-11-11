@@ -183,11 +183,13 @@ class PlaybackActivity : AppCompatActivity() {
     override fun onKeyDown(keyCode: Int, event: KeyEvent?): Boolean {
         // BACK 不参与「按键重现信息条」，否则永远收不掉、退不出（真机反馈 #2）
         if (keyCode != KeyEvent.KEYCODE_BACK) touchBar()
-        // 键位重构（spec 2026-11-11-ui-batch §③）：面板开着时焦点在面板行内、DPAD 由列表消费，
-        // 本方法只处理无焦点消费的场景——上下换台天然不抢面板导航（Review Focus 1）
+        // 键位重构（spec 2026-11-11-ui-batch §③）：UP/DOWN 换台仅在无面板打开时生效（spec 键路由细则）。
+        // 不能只依赖焦点分发：面板行在列表边界时 focusSearch 落空、按键会冒泡到这里（终审 I1），显式拦截
         when (keyCode) {
-            KeyEvent.KEYCODE_DPAD_UP -> { step(-1); return true }
-            KeyEvent.KEYCODE_DPAD_DOWN -> { step(1); return true }
+            KeyEvent.KEYCODE_DPAD_UP, KeyEvent.KEYCODE_DPAD_DOWN -> {
+                if (drawer.isOpen || epgPanel.isOpen) return true
+                step(if (keyCode == KeyEvent.KEYCODE_DPAD_UP) -1 else 1); return true
+            }
             KeyEvent.KEYCODE_DPAD_CENTER, KeyEvent.KEYCODE_ENTER -> {
                 if (event?.repeatCount != 0) return true
                 if (epgPanel.isOpen) epgPanel.hide()
@@ -240,6 +242,7 @@ class PlaybackActivity : AppCompatActivity() {
         lastRttMs = -1L
         barHasError = false; nowBar.text = name; touchBar()
         if (epgPanel.isOpen) epgPanel.show(name, tvgId)  // 面板开着时切台：标题与内容跟随新频道
+        if (drawer.isOpen) drawer.hide()  // 换台路径均先收抽屉（终审 I1：兑现注释，不留旧列表的抽屉在屏上）
         attachErrorListener()
         player.setMediaItem(MediaItem.fromUri(url))
         player.prepare(); player.playWhenReady = true

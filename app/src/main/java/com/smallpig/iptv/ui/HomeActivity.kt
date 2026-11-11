@@ -98,10 +98,16 @@ class HomeActivity : AppCompatActivity() {
         lifecycleScope.launch { reload() }
     }
 
-    /** 列表⇄画廊：换 layoutManager + adapter 布局开关；favList 不受影响（收藏恒列表，裁决3） */
+    private var appliedLayoutSpec: Pair<Boolean, Int>? = null // 已生效的 (grid, span)；null=未应用过
+
+    /** 列表⇄画廊：换 layoutManager + adapter 布局开关；favList 不受影响（收藏恒列表，裁决3）。
+     *  仅设置真变化才重建——无条件重建会丢滚动锚点且 restoreListFocus 对「焦点不在频道列表」直接放弃（终审 I2） */
     private fun applyDisplayMode() {
         val grid = uiSettings.mode == MODE_GRID
-        channelList.layoutManager = if (grid) GridLayoutManager(this, uiSettings.span) else LinearLayoutManager(this)
+        val span = uiSettings.span
+        if (!needsLayoutRebuild(appliedLayoutSpec, grid, span)) return
+        appliedLayoutSpec = Pair(grid, span)
+        channelList.layoutManager = if (grid) GridLayoutManager(this, span) else LinearLayoutManager(this)
         if (channelAdapter.grid != grid) {
             channelAdapter.grid = grid
             // 计划写 notifyItemRangeChanged，但换布局必须重建 ViewHolder（rebind 不换 item 视图），故用 notifyDataSetChanged；
@@ -282,7 +288,9 @@ private class ChannelAdapter(
         h.name.text = c.name
         h.fav.text = if (isFav(c)) "★" else ""
         val ctx = h.itemView.context
-        if (c.logoUrl != null) Glide.with(ctx).load(c.logoUrl).into(h.logo) else h.logo.setImageDrawable(null)
+        // 画廊无台标→灰底占位图标（spec 裁决2）；列表保持留白原状；setImageResource(0)=复用清空
+        if (c.logoUrl != null) Glide.with(ctx).load(c.logoUrl).into(h.logo)
+        else h.logo.setImageResource(if (grid) R.drawable.ic_channel_placeholder else 0)
         h.itemView.setOnClickListener { onClick(c) }
         h.itemView.setOnLongClickListener { onLongClick(c); true }
         h.itemView.setOnFocusChangeListener { _, has -> onFocus(if (has) c else null) }

@@ -21,6 +21,10 @@ fun nextMode(cur: String): String = if (normMode(cur) == MODE_GRID) MODE_LIST el
 /** 2..5 之外回退默认 3 */
 fun normSpan(v: Int): Int = if (v in 2..5) v else 3
 
+/** 仅模式翻转、或宫格态下路数变化时才重建 LayoutManager；onResume 原样返回不得重建（终审 I2：防滚动回顶） */
+fun needsLayoutRebuild(applied: Pair<Boolean, Int>?, grid: Boolean, span: Int): Boolean =
+    applied == null || applied.first != grid || (grid && applied.second != span)
+
 /** 2→3→4→5→2 循环；脏值直接回退默认 3（不进循环） */
 fun nextSpan(cur: Int): Int = when (cur) {
     2 -> 3

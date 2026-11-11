@@ -2,6 +2,7 @@ package com.smallpig.iptv
 
 import com.smallpig.iptv.ui.MODE_GRID
 import com.smallpig.iptv.ui.MODE_LIST
+import com.smallpig.iptv.ui.needsLayoutRebuild
 import com.smallpig.iptv.ui.nextMode
 import com.smallpig.iptv.ui.nextSpan
 import com.smallpig.iptv.ui.normMode
@@ -47,5 +48,31 @@ class UiSettingsTest {
         assertEquals(5, nextSpan(4))
         assertEquals(2, nextSpan(5))
         assertEquals(3, nextSpan(99)) // 脏值不进循环，直接回退默认 3
+    }
+
+    // ---- 终审 Important#2：仅模式/路数真变化才重建 LayoutManager（防 onResume 无条件重建致滚动回顶） ----
+
+    @Test
+    fun needsLayoutRebuild_firstApplyAlwaysRebuilds() {
+        assertEquals(true, needsLayoutRebuild(null, false, 3))
+    }
+
+    @Test
+    fun needsLayoutRebuild_sameSpecNoRebuild() {
+        assertEquals(false, needsLayoutRebuild(Pair(false, 3), false, 3))
+        assertEquals(false, needsLayoutRebuild(Pair(true, 4), true, 4))
+    }
+
+    @Test
+    fun needsLayoutRebuild_modeToggleAlwaysRebuilds() {
+        assertEquals(true, needsLayoutRebuild(Pair(false, 3), true, 3))
+        assertEquals(true, needsLayoutRebuild(Pair(true, 3), false, 3))
+        assertEquals(true, needsLayoutRebuild(Pair(true, 3), false, 5)) // 列表态忽略旧 span，但模式变了必须重建
+    }
+
+    @Test
+    fun needsLayoutRebuild_spanOnlyMattersInGridMode() {
+        assertEquals(true, needsLayoutRebuild(Pair(true, 3), true, 4))   // 宫格换路数→重建
+        assertEquals(false, needsLayoutRebuild(Pair(false, 3), false, 4)) // 列表态调路数→不重建
     }
 }
