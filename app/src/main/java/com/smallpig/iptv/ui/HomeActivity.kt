@@ -2,6 +2,9 @@ package com.smallpig.iptv.ui
 
 import android.content.Intent
 import android.os.Bundle
+import android.text.Spannable
+import android.text.SpannableString
+import android.text.style.ForegroundColorSpan
 import android.view.KeyEvent
 import android.view.LayoutInflater
 import android.view.View
@@ -265,13 +268,21 @@ private class ChannelAdapter(
         h.itemView.setOnClickListener { onClick(c) }
         h.itemView.setOnLongClickListener { onLongClick(c); true }
         h.itemView.setOnFocusChangeListener { _, has -> onFocus(if (has) c else null) }
-        val rttTxt = rttByUrl[c.streamUrl]?.takeIf { it >= 0 }?.let { "网络~${it}ms" }
-        h.now.text = rttTxt ?: ""
+        val rttMs = rttByUrl[c.streamUrl]
+        h.now.text = applyGreen(nowLabel(null, rttMs))
         scope.launch {
             val t = epgFor(c)
             if (h.bindingAdapterPosition == pos) {
-                h.now.text = listOfNotNull(t, rttTxt).joinToString("　·　")
+                h.now.text = applyGreen(nowLabel(t, rttMs))
             }
+        }
+    }
+    /** 仅毫秒段绿：每次 bind 新建 SpannableString，赋值整体覆盖旧 span，复用不传染（Review Focus 5） */
+    private fun applyGreen(l: NowLabel): CharSequence {
+        if (l.greenFrom < 0 || l.text.isEmpty()) return l.text
+        return SpannableString(l.text).apply {
+            setSpan(ForegroundColorSpan(0xFF4CAF50.toInt()), l.greenFrom, l.text.length,
+                Spannable.SPAN_EXCLUSIVE_EXCLUSIVE)
         }
     }
 }
