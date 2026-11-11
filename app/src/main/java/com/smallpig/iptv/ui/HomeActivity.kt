@@ -76,6 +76,8 @@ class HomeActivity : AppCompatActivity() {
         tabs[2].setOnClickListener { startActivity(Intent(this, SubsActivity::class.java)) }
         // 多屏不是 showTab 状态而是跳转（spec §8），故不入 tabs 列表
         findViewById<TextView>(R.id.tabMulti).setOnClickListener { startActivity(Intent(this, MultiScreenActivity::class.java)) }
+        // 设置页同多屏：跳转而非 showTab 状态，不入 tabs 列表
+        findViewById<TextView>(R.id.tabSettings).setOnClickListener { startActivity(Intent(this, SettingsActivity::class.java)) }
         groupList.layoutManager = LinearLayoutManager(this); groupList.adapter = groupAdapter
         channelList.layoutManager = LinearLayoutManager(this); channelList.adapter = channelAdapter
         favList.layoutManager = LinearLayoutManager(this); favList.adapter = favAdapter
