@@ -5,6 +5,8 @@ local.properties
 .idea
 *.iml
 .kotlin
+# superpowers 技能工作区（brainstorm 草图 / sdd ledger，本地草稿不入库）
+.superpowers/
 # release 签名凭据，勿入库（备份说明见 docs/RELEASE.md）
 keystore/
 keystore.properties
