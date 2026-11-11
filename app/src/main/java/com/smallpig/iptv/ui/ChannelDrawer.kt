@@ -31,6 +31,7 @@ class ChannelDrawer(root: View, private val repo: Repository, private val scope:
     private var currentGroup: String? = null
     private var pickCallback: ((PickRow) -> Unit)? = null
     private var subId: Long? = null   // 抽屉切换行选中的订阅（null=当前订阅；跨订阅同屏方案 A）
+    private var showSubChips = true   // 播放页传 false：换台恒在当前订阅（裁决6）；每次 show 记录参数，多屏默认 true 不受残留影响
 
     var isOpen = false
         private set
@@ -50,8 +51,9 @@ class ChannelDrawer(root: View, private val repo: Repository, private val scope:
     }
 
     /** 打开并定位到 currentUrl（该格当前频道）行；首次打开从右缘滑入（仿 EpgPanel.show）。 */
-    fun show(currentUrl: String?, onPick: (PickRow) -> Unit) {
+    fun show(currentUrl: String?, showSubChips: Boolean = true, onPick: (PickRow) -> Unit) {
         pickCallback = onPick
+        this.showSubChips = showSubChips
         val first = !isOpen
         isOpen = true
         if (first) {
@@ -100,7 +102,7 @@ class ChannelDrawer(root: View, private val repo: Repository, private val scope:
     private fun load(currentUrl: String?) {
         scope.launch {
             val subs = repo.subscriptions()
-            if (subs.size > 1) { subRow.visibility = View.VISIBLE; buildSubChips(subs, currentUrl) } else subRow.visibility = View.GONE
+            if (showSubChips && subs.size > 1) { subRow.visibility = View.VISIBLE; buildSubChips(subs, currentUrl) } else subRow.visibility = View.GONE
             val sub = pickSubscription(subs, subId)
             if (sub == null) {   // 无订阅空态（Review Focus #6）
                 title.text = "暂无订阅：请到『订阅管理』添加"

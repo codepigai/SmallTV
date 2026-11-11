@@ -29,16 +29,7 @@
         android:layout_gravity="bottom" android:background="#80000000"
         android:padding="12dp" android:textColor="#DDDDDD" android:textSize="16sp" />
 
-    <LinearLayout android:id="@+id/controls"
-        android:layout_width="wrap_content" android:layout_height="wrap_content"
-        android:layout_gravity="bottom|end" android:layout_marginEnd="32dp" android:layout_marginBottom="64dp"
-        android:orientation="horizontal" android:visibility="gone">
-        <TextView android:id="@+id/ctrlPrev" style="@style/CtrlBtn" android:text="上一台" />
-        <TextView android:id="@+id/ctrlNext" style="@style/CtrlBtn" android:text="下一台" />
-        <TextView android:id="@+id/ctrlFav" style="@style/CtrlBtn" android:text="收藏" />
-        <TextView android:id="@+id/ctrlEpg" style="@style/CtrlBtn" android:text="节目单" />
-        <TextView android:id="@+id/ctrlBack" style="@style/CtrlBtn" android:text="返回" />
-    </LinearLayout>
-
+    <!-- 键位重构（spec 2026-11-11-ui-batch §③）：底部控制条已删，上下=换台/确认=节目单/右键=频道抽屉 -->
     <include layout="@layout/view_epg_panel" />
+    <include layout="@layout/view_channel_drawer" />
 </FrameLayout>
