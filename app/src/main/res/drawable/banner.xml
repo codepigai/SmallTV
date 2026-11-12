@@ -1,4 +1,9 @@
-<shape xmlns:android="http://schemas.android.com/apk/res/android" android:shape="rectangle">
-    <solid android:color="#0F3460"/>
-    <size android:width="320dp" android:height="180dp"/>
-</shape>
+<?xml version="1.0" encoding="utf-8"?>
+<!-- TV 启动器横幅（16:9 320x180）：logo 为方图不可拉伸，深底 #0B1130（logo 底色取样）+ 居中 180dp 构图 -->
+<layer-list xmlns:android="http://schemas.android.com/apk/res/android">
+    <item>
+        <shape android:shape="rectangle"><solid android:color="#0B1130"/></shape>
+    </item>
+    <item android:gravity="center" android:width="180dp" android:height="180dp"
+        android:drawable="@drawable/app_logo"/>
+</layer-list>
