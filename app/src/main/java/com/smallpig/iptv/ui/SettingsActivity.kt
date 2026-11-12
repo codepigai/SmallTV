@@ -36,6 +36,6 @@ class SettingsActivity : AppCompatActivity() {
         rowModeValue.text = "${if (ui.mode == MODE_GRID) "画廊" else "列表"}（确认键切换）"
         rowSpanValue.text = "${ui.span}（确认键切换）"
         val info = packageManager.getPackageInfo(packageName, 0)
-        rowVersionValue.text = "版本 ${info.versionName} (${info.versionCode})"
+        rowVersionValue.text = "${info.versionName} (${info.versionCode})"  // 行名已是「版本」，值不重复前缀（终审 I2）
     }
 }
