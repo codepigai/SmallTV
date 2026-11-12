@@ -24,6 +24,15 @@ import com.smallpig.iptv.parse.codecDisplayName
 import com.smallpig.iptv.parse.rttLabel
 import kotlinx.coroutines.launch
 
+/** 播放页 UP/DOWN 意图（JVM 可测）：焦点在面板内→放行系统焦点导航；否则换台 */
+enum class UpDownIntent { PASS_TO_PANEL, STEP_UP, STEP_DOWN }
+
+fun upDownIntent(hasFocusInPanels: Boolean, isUp: Boolean): UpDownIntent = when {
+    hasFocusInPanels -> UpDownIntent.PASS_TO_PANEL
+    isUp -> UpDownIntent.STEP_UP
+    else -> UpDownIntent.STEP_DOWN
+}
+
 class PlaybackActivity : AppCompatActivity() {
     companion object {
         const val EXTRA_NAME = "name"
@@ -183,13 +192,18 @@ class PlaybackActivity : AppCompatActivity() {
     override fun onKeyDown(keyCode: Int, event: KeyEvent?): Boolean {
         // BACK 不参与「按键重现信息条」，否则永远收不掉、退不出（真机反馈 #2）
         if (keyCode != KeyEvent.KEYCODE_BACK) touchBar()
-        // 键位重构（spec 2026-11-11-ui-batch §③）：UP/DOWN 换台。拦截条件=焦点确在面板内：
-        // 终审 I1（行在列表边界 focusSearch 落空会冒泡到此）由 hasFocusInside 覆盖；
-        // 真机反馈②：面板开着但焦点未落入（EPG 空/数据缺失）不得做死换台键——放行换台，restartWith 会刷新开着的面板
+        // 键位重构（spec 2026-11-11-ui-batch §③）：UP/DOWN 默认换台；焦点在抽屉/节目单内时**放行**——
+        // 导航键的滚动/移焦由 ViewRootImpl 在 onKeyDown 之后执行，这里 return true 吞咽会把它挡死
+        //（真机复报②：v1.2 的「面板内 return true」正是列表死键根因；return false 才让面板动起来。
+        // 终审 I1 边界泄漏不再特殊处理：焦点若搜索出面板落在播放器锚点，hasFocusInside 转 false，下次按键换台属预期）
         when (keyCode) {
             KeyEvent.KEYCODE_DPAD_UP, KeyEvent.KEYCODE_DPAD_DOWN -> {
-                if (drawer.hasFocusInside || epgPanel.hasFocusInside) return true
-                step(if (keyCode == KeyEvent.KEYCODE_DPAD_UP) -1 else 1); return true
+                when (upDownIntent(drawer.hasFocusInside || epgPanel.hasFocusInside, keyCode == KeyEvent.KEYCODE_DPAD_UP)) {
+                    UpDownIntent.PASS_TO_PANEL -> return false
+                    UpDownIntent.STEP_UP -> step(-1)
+                    UpDownIntent.STEP_DOWN -> step(1)
+                }
+                return true
             }
             KeyEvent.KEYCODE_DPAD_CENTER, KeyEvent.KEYCODE_ENTER -> {
                 if (event?.repeatCount != 0) return true
