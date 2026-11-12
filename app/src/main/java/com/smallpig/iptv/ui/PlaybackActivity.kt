@@ -183,11 +183,12 @@ class PlaybackActivity : AppCompatActivity() {
     override fun onKeyDown(keyCode: Int, event: KeyEvent?): Boolean {
         // BACK 不参与「按键重现信息条」，否则永远收不掉、退不出（真机反馈 #2）
         if (keyCode != KeyEvent.KEYCODE_BACK) touchBar()
-        // 键位重构（spec 2026-11-11-ui-batch §③）：UP/DOWN 换台仅在无面板打开时生效（spec 键路由细则）。
-        // 不能只依赖焦点分发：面板行在列表边界时 focusSearch 落空、按键会冒泡到这里（终审 I1），显式拦截
+        // 键位重构（spec 2026-11-11-ui-batch §③）：UP/DOWN 换台。拦截条件=焦点确在面板内：
+        // 终审 I1（行在列表边界 focusSearch 落空会冒泡到此）由 hasFocusInside 覆盖；
+        // 真机反馈②：面板开着但焦点未落入（EPG 空/数据缺失）不得做死换台键——放行换台，restartWith 会刷新开着的面板
         when (keyCode) {
             KeyEvent.KEYCODE_DPAD_UP, KeyEvent.KEYCODE_DPAD_DOWN -> {
-                if (drawer.isOpen || epgPanel.isOpen) return true
+                if (drawer.hasFocusInside || epgPanel.hasFocusInside) return true
                 step(if (keyCode == KeyEvent.KEYCODE_DPAD_UP) -1 else 1); return true
             }
             KeyEvent.KEYCODE_DPAD_CENTER, KeyEvent.KEYCODE_ENTER -> {
@@ -205,8 +206,9 @@ class PlaybackActivity : AppCompatActivity() {
             KeyEvent.KEYCODE_DPAD_RIGHT -> {
                 if (drawer.isOpen) drawer.hide()
                 else {
-                    epgPanel.hide()  // 面板互斥（裁决5）；换台恒在当前订阅（裁决6：showSubChips=false）
-                    drawer.show(chUrl, showSubChips = false) { row ->
+                    // 面板互斥（裁决5）；真机反馈③：右键=收藏夹抽屉（全局收藏；改判自 spec「当前订阅频道列表」）
+                    epgPanel.hide()
+                    drawer.show(chUrl, showSubChips = false, favOnly = true) { row ->
                         drawer.hide()
                         restartWith(row.name, row.url, row.tvgId)
                     }

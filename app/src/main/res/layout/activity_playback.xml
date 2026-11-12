@@ -29,7 +29,7 @@
         android:layout_gravity="bottom" android:background="#80000000"
         android:padding="12dp" android:textColor="#DDDDDD" android:textSize="16sp" />
 
-    <!-- 键位重构（spec 2026-11-11-ui-batch §③）：底部控制条已删，上下=换台/确认=节目单/右键=频道抽屉 -->
+    <!-- 键位重构（spec 2026-11-11-ui-batch §③）：底部控制条已删，上下=换台/确认=节目单/右键=收藏夹抽屉（真机反馈③改判） -->
     <include layout="@layout/view_epg_panel" />
     <include layout="@layout/view_channel_drawer" />
 </FrameLayout>

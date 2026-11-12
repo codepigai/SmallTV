@@ -36,11 +36,13 @@
   - **上/下** ＝ 换台（原 LEFT/RIGHT 的 `step(-1)/step(1)` 语义平移到 UP/DOWN）。
   - **确认（CENTER/ENTER）** ＝ 呼出节目单 `EpgPanel`（本就右侧滑出 460dp，触发键从"控制条里的节目单按钮"改直绑）。
   - **右键** ＝ 呼出频道列表：复用多屏的 `ChannelDrawer`（构造签名与 EpgPanel 相同 `(root, repo, scope)`）；`show(currentUrl, onPick)`，选中→ `restartWith(name,url,tvgId)` 并收抽屉。
+  - **〔2026-11-12 真机验收改判③〕** 右键改为呼出**收藏夹列表**：`ChannelDrawer.show` 增 `favOnly: Boolean = false` 模式——频道列恒为全局收藏行（`favoritesToRows`），分组列只留「收藏」，标题「收藏夹」，空收藏给引导文案；选中→ `restartWith` 并收抽屉。收藏本就跨订阅（首页播收藏亦不依赖当前订阅），与裁决6「换台恒在当前订阅」不冲突。多屏默认参数不受影响。
   - **订阅 chips 隐藏（裁决）**：抽屉现有「≥2 订阅显示切换 chips」是为多屏同屏设计的；播放页换台语义始终是**当前订阅**（`step()` 也只在当前订阅内定位），跨订阅选台会让 UP/DOWN 换台断链（streamUrl 定位失败跳首尾）。给 `ChannelDrawer.show` 加 `showSubChips: Boolean = true` 参数，播放页传 false。多屏行为不变。
   - **MENU** ＝ 信息面板（保持现状）。
   - **BACK** 分层：频道列表开→关它；否则节目单开→关它；否则信息面板开→关它；否则退出播放页。
 - **面板互斥**：呼出其一自动收其二。
 - **键路由细则（我的裁决）**：面板打开时焦点在面板行内，DPAD 由列表消费（导航/选中），UP/DOWN 换台只在无面板打开时生效——依赖 Android 焦点分发天然实现，验收点。
+- **〔2026-11-12 真机验收修订②〕** UP/DOWN 的拦截条件修正为**焦点确在面板内**（`hasFocusInside`）：面板开着但焦点未落入（EPG 无数据、首次打开落焦失败）时换台键不得做死——放行换台，换台路径 `restartWith` 会同步刷新开着的面板。终审 I1 的边界冒泡拦截由该条件天然覆盖。焦点落入改 `focusRowAfterLayout`（等 layout 完成后 requestFocus；`post{}` 早于 traversal 会静默漏焦）。节目单呼出后应可直接上下浏览行=验收点。
 - 底部 nowBar（当前节目条，6s 自动隐藏）不属于控制条，保留。
 
 ## ④ 订阅管理界面改版（SubsActivity + activity_subs.xml）
