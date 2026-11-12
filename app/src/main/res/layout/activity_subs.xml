@@ -17,8 +17,12 @@
         <androidx.recyclerview.widget.RecyclerView android:id="@+id/subList"
             android:layout_width="0dp" android:layout_height="match_parent" android:layout_weight="1" />
 
-        <LinearLayout android:layout_width="0dp" android:layout_height="match_parent"
-            android:layout_weight="1" android:layout_marginStart="24dp" android:orientation="vertical">
+        <!-- 右列套 ScrollView（真机验收②：480dp 高的小屏 ROM 上详情卡+四按钮溢出，删除按钮被裁）；
+             焦点行获焦时 ScrollView 自动滚入可见区，TV 操作不受影响 -->
+        <ScrollView android:layout_width="0dp" android:layout_height="match_parent"
+            android:layout_weight="1" android:layout_marginStart="24dp" android:fillViewport="true">
+            <LinearLayout android:layout_width="match_parent" android:layout_height="wrap_content"
+                android:orientation="vertical">
             <!-- 详情卡（spec 2026-11-12-ui-visual §⑤）：#202A55 圆角卡与下方按钮同列左对齐（按钮 marginStart 归零） -->
             <LinearLayout android:layout_width="match_parent" android:layout_height="wrap_content"
                 android:orientation="vertical" android:background="@drawable/card_bg"
@@ -39,6 +43,7 @@
             <TextView android:id="@+id/btnRefresh" style="@style/CtrlBtn" android:text="刷新订阅" android:layout_marginStart="0dp" android:layout_marginTop="14dp" />
             <TextView android:id="@+id/btnEdit" style="@style/CtrlBtn" android:text="编辑" android:layout_marginStart="0dp" android:layout_marginTop="14dp" />
             <TextView android:id="@+id/btnDelete" style="@style/CtrlBtn" android:text="删除" android:layout_marginStart="0dp" android:layout_marginTop="14dp" />
-        </LinearLayout>
+            </LinearLayout>
+        </ScrollView>
     </LinearLayout>
 </LinearLayout>
