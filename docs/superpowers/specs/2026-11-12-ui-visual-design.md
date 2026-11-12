@@ -43,10 +43,13 @@ v1.2 功能验收通过后做一轮纯视觉打磨：品牌化（SmallTV 命名 
 - `groupList` 宽 260dp → **200dp**。
 
 ## ④ 全局字体
-- `GenJyuuGothic-Normal-2.ttf` → `res/font/genjyuu.ttf`（资源名小写字母数字下划线）。
-- `themes.xml` Theme.IptvTv 加 `<item name="android:fontFamily">@font/genjyuu</item>`。
-- 字体文件保留在根目录（用户素材，不删），但**不提交进 git**（.ttf 二进制入 res/font 即可，根目录原件属未跟踪素材，同 apk 惯例）。
-- 预期 APK +≈5MB，用户已接受。
+- 〔终审改判 C1〕原选 `GenJyuuGothic-Normal-2.ttf` 实为日文字体（cmap 仅 JIS 汉字 3014，GB2312 位未置），简中 UI 文案会逐字混排回退——用户裁决改换简体思源黑体。
+- 现用 **Source Han Sans SC Medium**（思源黑体，SIL OFL 1.1）：`Source_Han_Sans_SC_Medium_Medium.otf`（根目录原件，未跟踪）→ `res/font/source_han_sans_sc.otf`。
+  - 出处：Adobe GitHub `adobe-fonts/source-han-sans` Release 2.004-R（OTF 单字重 Medium）；版权 `© 2014-2021 Adobe (http://www.adobe.com/), with Reserved Font Name 'Source'`。
+  - 许可随包：`app/src/main/assets/fonts/OFL.txt`（OFL 1.1 要求分发时携带许可与版权声明）。
+- `themes.xml` Theme.IptvTv：`<item name="android:fontFamily">@font/source_han_sans_sc</item>`。
+- 字体文件保留在根目录（用户素材，不删），但**不提交进 git**（二进制入 res/font 即可，根目录原件属未跟踪素材，同 apk 惯例）。
+- 预期 APK +≈8MB（原 +5MB 系 GenJyuuGothic 估值；思源 SC Medium OTF 16.5MB、deflate 后入包），量级同档，随交付报告实测数。
 
 ## ⑤ 订阅管理
 - `item_sub.xml`：`layout_marginBottom` 14dp → **20dp**（圆角随全局 focus_bg 12dp）。
