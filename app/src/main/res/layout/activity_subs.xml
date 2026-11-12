@@ -23,26 +23,27 @@
             android:layout_weight="1" android:layout_marginStart="24dp" android:fillViewport="true">
             <LinearLayout android:layout_width="match_parent" android:layout_height="wrap_content"
                 android:orientation="vertical">
-            <!-- 详情卡（spec 2026-11-12-ui-visual §⑤）：#202A55 圆角卡与下方按钮同列左对齐（按钮 marginStart 归零） -->
+            <!-- 详情卡（spec 2026-11-12-ui-visual §⑤）：#202A55 圆角卡与下方按钮同列左对齐（按钮 marginStart 归零）。
+                 真机复验②：紧凑排布（padding 12/行距 2-4/按钮 padding 8+marginTop 8），480dp 高小屏一屏放得下整列 -->
             <LinearLayout android:layout_width="match_parent" android:layout_height="wrap_content"
                 android:orientation="vertical" android:background="@drawable/card_bg"
-                android:padding="16dp" android:layout_marginBottom="16dp">
+                android:padding="12dp" android:layout_marginBottom="10dp">
                 <TextView android:id="@+id/subInfoTitle" android:layout_width="wrap_content" android:layout_height="wrap_content"
                     android:text="订阅信息" android:textSize="12sp" android:textColor="#8899BB" />
                 <TextView android:id="@+id/subRowName" android:layout_width="match_parent" android:layout_height="wrap_content"
-                    android:layout_marginTop="8dp" android:textSize="14sp" android:textColor="#FFFFFF" />
+                    android:layout_marginTop="4dp" android:textSize="14sp" android:textColor="#FFFFFF" />
                 <TextView android:id="@+id/subRowUrl" android:layout_width="match_parent" android:layout_height="wrap_content"
-                    android:layout_marginTop="6dp" android:textSize="14sp" android:textColor="#DDDDDD"
+                    android:layout_marginTop="2dp" android:textSize="14sp" android:textColor="#DDDDDD"
                     android:maxLines="2" android:ellipsize="end" />
                 <TextView android:id="@+id/subRowMeta" android:layout_width="match_parent" android:layout_height="wrap_content"
-                    android:layout_marginTop="6dp" android:textSize="14sp" android:textColor="#DDDDDD" />
+                    android:layout_marginTop="2dp" android:textSize="14sp" android:textColor="#DDDDDD" />
                 <TextView android:id="@+id/subRowEpg" android:layout_width="match_parent" android:layout_height="wrap_content"
-                    android:layout_marginTop="6dp" android:textSize="14sp" android:textColor="#DDDDDD" />
+                    android:layout_marginTop="2dp" android:textSize="14sp" android:textColor="#DDDDDD" />
             </LinearLayout>
-            <TextView android:id="@+id/btnCurrent" style="@style/CtrlBtn" android:text="设为当前" android:layout_marginStart="0dp" android:layout_marginTop="14dp" />
-            <TextView android:id="@+id/btnRefresh" style="@style/CtrlBtn" android:text="刷新订阅" android:layout_marginStart="0dp" android:layout_marginTop="14dp" />
-            <TextView android:id="@+id/btnEdit" style="@style/CtrlBtn" android:text="编辑" android:layout_marginStart="0dp" android:layout_marginTop="14dp" />
-            <TextView android:id="@+id/btnDelete" style="@style/CtrlBtn" android:text="删除" android:layout_marginStart="0dp" android:layout_marginTop="14dp" />
+            <TextView android:id="@+id/btnCurrent" style="@style/CtrlBtn" android:text="设为当前" android:layout_marginStart="0dp" android:layout_marginTop="8dp" android:padding="8dp" />
+            <TextView android:id="@+id/btnRefresh" style="@style/CtrlBtn" android:text="刷新订阅" android:layout_marginStart="0dp" android:layout_marginTop="8dp" android:padding="8dp" />
+            <TextView android:id="@+id/btnEdit" style="@style/CtrlBtn" android:text="编辑" android:layout_marginStart="0dp" android:layout_marginTop="8dp" android:padding="8dp" />
+            <TextView android:id="@+id/btnDelete" style="@style/CtrlBtn" android:text="删除" android:layout_marginStart="0dp" android:layout_marginTop="8dp" android:padding="8dp" />
             </LinearLayout>
         </ScrollView>
     </LinearLayout>
