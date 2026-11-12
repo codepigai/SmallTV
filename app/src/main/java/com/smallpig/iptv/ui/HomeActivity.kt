@@ -2,6 +2,9 @@ package com.smallpig.iptv.ui
 
 import android.content.Intent
 import android.os.Bundle
+import android.text.Spannable
+import android.text.SpannableString
+import android.text.style.ForegroundColorSpan
 import android.view.KeyEvent
 import android.view.LayoutInflater
 import android.view.View
@@ -11,6 +14,7 @@ import android.widget.TextView
 import android.widget.Toast
 import androidx.appcompat.app.AppCompatActivity
 import androidx.lifecycle.lifecycleScope
+import androidx.recyclerview.widget.GridLayoutManager
 import androidx.recyclerview.widget.LinearLayoutManager
 import androidx.recyclerview.widget.RecyclerView
 import com.bumptech.glide.Glide
@@ -27,6 +31,7 @@ import kotlinx.coroutines.launch
 
 class HomeActivity : AppCompatActivity() {
     private val repo get() = (application as App).repo
+    private val uiSettings by lazy { UiSettings(this) }
 
     private lateinit var panelBrowse: View
     private lateinit var statusBar: TextView
@@ -76,17 +81,39 @@ class HomeActivity : AppCompatActivity() {
         tabs[2].setOnClickListener { startActivity(Intent(this, SubsActivity::class.java)) }
         // 多屏不是 showTab 状态而是跳转（spec §8），故不入 tabs 列表
         findViewById<TextView>(R.id.tabMulti).setOnClickListener { startActivity(Intent(this, MultiScreenActivity::class.java)) }
+        // 设置页同多屏：跳转而非 showTab 状态，不入 tabs 列表
+        findViewById<TextView>(R.id.tabSettings).setOnClickListener { startActivity(Intent(this, SettingsActivity::class.java)) }
         groupList.layoutManager = LinearLayoutManager(this); groupList.adapter = groupAdapter
         channelList.layoutManager = LinearLayoutManager(this); channelList.adapter = channelAdapter
         favList.layoutManager = LinearLayoutManager(this); favList.adapter = favAdapter
         epgPanel = EpgPanel(findViewById(android.R.id.content), repo, lifecycleScope)
+        applyDisplayMode()
         showTab(0)
         findViewById<View>(R.id.tabAll).requestFocus()
     }
 
     override fun onResume() {
         super.onResume()
+        applyDisplayMode() // 设置页改过显示方式则回首页立即重设（spec §⑤生效方式）
         lifecycleScope.launch { reload() }
+    }
+
+    private var appliedLayoutSpec: Pair<Boolean, Int>? = null // 已生效的 (grid, span)；null=未应用过
+
+    /** 列表⇄画廊：换 layoutManager + adapter 布局开关；favList 不受影响（收藏恒列表，裁决3）。
+     *  仅设置真变化才重建——无条件重建会丢滚动锚点且 restoreListFocus 对「焦点不在频道列表」直接放弃（终审 I2） */
+    private fun applyDisplayMode() {
+        val grid = uiSettings.mode == MODE_GRID
+        val span = uiSettings.span
+        if (!needsLayoutRebuild(appliedLayoutSpec, grid, span)) return
+        appliedLayoutSpec = Pair(grid, span)
+        channelList.layoutManager = if (grid) GridLayoutManager(this, span) else LinearLayoutManager(this)
+        if (channelAdapter.grid != grid) {
+            channelAdapter.grid = grid
+            // 计划写 notifyItemRangeChanged，但换布局必须重建 ViewHolder（rebind 不换 item 视图），故用 notifyDataSetChanged；
+            // 焦点由随后 reload() 的 restoreListFocus 恢复（Review Focus 3）
+            channelAdapter.notifyDataSetChanged()
+        }
     }
 
     private fun showTab(idx: Int) {
@@ -227,6 +254,10 @@ private class GroupAdapter(val onClick: (String?) -> Unit) : RecyclerView.Adapte
     }
 }
 
+/** 真机反馈①：RecycledViewPool 按 viewType 回收 holder，画廊/列表若同 viewType，
+ *  切模式后另一模式的卡会被原样复用（item 视图不换布局）→ 必须分属不同 viewType（列表保持 0，收藏等不受牵连） */
+fun channelItemViewType(grid: Boolean): Int = if (grid) 1 else 0
+
 private class ChannelAdapter(
     val onClick: (Channel) -> Unit,
     val onLongClick: (Channel) -> Unit,
@@ -237,6 +268,7 @@ private class ChannelAdapter(
 ) : RecyclerView.Adapter<ChannelAdapter.VH>() {
     private var items: List<Channel> = emptyList()
     private val rttByUrl = HashMap<String, Long>()
+    var grid = false // 画廊宫格开关（item_channel_grid 布局；收藏列表恒 false 不受影响）
     fun submit(list: List<Channel>) { if (items == list) return; items = list; notifyDataSetChanged() }
     /** EPG 数据变化用 payload 原地重绑，保住当前焦点行 */
     fun refreshEpgLabels() { if (items.isNotEmpty()) notifyItemRangeChanged(0, items.size, "epg") }
@@ -251,25 +283,39 @@ private class ChannelAdapter(
         val now: TextView = v.findViewById(R.id.chNow)
         val fav: TextView = v.findViewById(R.id.chFav)
     }
+    override fun getItemViewType(position: Int) = channelItemViewType(grid)
     override fun onCreateViewHolder(parent: ViewGroup, viewType: Int) =
-        VH(LayoutInflater.from(parent.context).inflate(R.layout.item_channel, parent, false))
+        VH(LayoutInflater.from(parent.context).inflate(
+            if (viewType == 1) R.layout.item_channel_grid else R.layout.item_channel, parent, false))
     override fun getItemCount() = items.size
     override fun onBindViewHolder(h: VH, pos: Int) {
         val c = items[pos]
         h.name.text = c.name
         h.fav.text = if (isFav(c)) "★" else ""
         val ctx = h.itemView.context
-        if (c.logoUrl != null) Glide.with(ctx).load(c.logoUrl).into(h.logo) else h.logo.setImageDrawable(null)
+        // 画廊无台标→灰底占位图标（spec 裁决2）；列表保持留白原状；setImageResource(0)=复用清空
+        if (c.logoUrl != null) Glide.with(ctx).load(c.logoUrl).into(h.logo)
+        else h.logo.setImageResource(if (grid) R.drawable.ic_channel_placeholder else 0)
         h.itemView.setOnClickListener { onClick(c) }
         h.itemView.setOnLongClickListener { onLongClick(c); true }
         h.itemView.setOnFocusChangeListener { _, has -> onFocus(if (has) c else null) }
-        val rttTxt = rttByUrl[c.streamUrl]?.takeIf { it >= 0 }?.let { "网络~${it}ms" }
-        h.now.text = rttTxt ?: ""
-        scope.launch {
-            val t = epgFor(c)
-            if (h.bindingAdapterPosition == pos) {
-                h.now.text = listOfNotNull(t, rttTxt).joinToString("　·　")
+        val rttMs = rttByUrl[c.streamUrl]
+        h.now.text = applyGreen(nowLabel(null, rttMs))
+        if (!grid) { // 宫格卡不显示节目名：省掉逐格 epgFor 挂起查询
+            scope.launch {
+                val t = epgFor(c)
+                if (h.bindingAdapterPosition == pos) {
+                    h.now.text = applyGreen(nowLabel(t, rttMs))
+                }
             }
+        }
+    }
+    /** 仅毫秒段绿：每次 bind 新建 SpannableString，赋值整体覆盖旧 span，复用不传染（Review Focus 5） */
+    private fun applyGreen(l: NowLabel): CharSequence {
+        if (l.greenFrom < 0 || l.text.isEmpty()) return l.text
+        return SpannableString(l.text).apply {
+            setSpan(ForegroundColorSpan(0xFF4CAF50.toInt()), l.greenFrom, l.text.length,
+                Spannable.SPAN_EXCLUSIVE_EXCLUSIVE)
         }
     }
 }

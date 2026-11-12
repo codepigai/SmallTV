@@ -26,5 +26,6 @@
         <activity android:name=".ui.MultiScreenActivity" android:screenOrientation="landscape" android:configChanges="keyboardHidden|screenSize|screenLayout|smallestScreenSize|orientation|navigation" />
         <activity android:name=".ui.SubsActivity" android:screenOrientation="landscape" />
         <activity android:name=".ui.SubEditActivity" android:screenOrientation="landscape" />
+        <activity android:name=".ui.SettingsActivity" android:screenOrientation="landscape" />
     </application>
 </manifest>

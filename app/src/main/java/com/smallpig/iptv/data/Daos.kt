@@ -17,6 +17,7 @@ interface SubscriptionDao {
     @Query("SELECT * FROM subscriptions WHERE id = :id") suspend fun byId(id: Long): Subscription?
     @Query("SELECT * FROM subscriptions WHERE isCurrent = 1 LIMIT 1") suspend fun current(): Subscription?
     @Query("UPDATE subscriptions SET isCurrent = 0") suspend fun clearCurrent()
+    @Query("UPDATE subscriptions SET lastUpdatedAt = :ms WHERE id = :id") suspend fun touch(id: Long, ms: Long)
     @Query("UPDATE subscriptions SET isCurrent = 1 WHERE id = :id") suspend fun setCurrent(id: Long)
 
     /** 保证"仅一条 current"不变量的原子入口，调用方勿再手工 clear+set */

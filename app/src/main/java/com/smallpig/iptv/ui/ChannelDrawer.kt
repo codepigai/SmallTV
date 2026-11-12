@@ -31,14 +31,18 @@ class ChannelDrawer(root: View, private val repo: Repository, private val scope:
     private var currentGroup: String? = null
     private var pickCallback: ((PickRow) -> Unit)? = null
     private var subId: Long? = null   // 抽屉切换行选中的订阅（null=当前订阅；跨订阅同屏方案 A）
+    private var showSubChips = true   // 播放页传 false：换台恒在当前订阅（裁决6）；每次 show 记录参数，多屏默认 true 不受残留影响
+    private var favOnly = false       // 真机反馈③：播放页右键=收藏夹抽屉（全局收藏，不依赖当前订阅）；多屏默认 false 不受影响
 
     var isOpen = false
         private set
+    /** 焦点是否已在抽屉频道列内（真机反馈②：播放页据此放行 UP/DOWN，焦点未落时不做死换台键） */
+    val hasFocusInside: Boolean get() = channelList.hasFocus()
 
     private val groupAdapter = DrawerGroupAdapter { g ->
         currentGroup = g
         channelAdapter.submit(filterRows(allRows, g, favRows))
-        channelList.post { channelList.getChildAt(0)?.requestFocus() }   // 组点击后焦点进频道列（同首页语义）
+        focusRowAfterLayout(channelList, 0)   // 组点击后焦点进频道列（同首页语义）；post{} 早于布局会漏焦（真机反馈②）
     }
     private val channelAdapter = DrawerChannelAdapter { row -> pickCallback?.invoke(row) }
 
@@ -49,9 +53,12 @@ class ChannelDrawer(root: View, private val repo: Repository, private val scope:
         channelList.adapter = channelAdapter
     }
 
-    /** 打开并定位到 currentUrl（该格当前频道）行；首次打开从右缘滑入（仿 EpgPanel.show）。 */
-    fun show(currentUrl: String?, onPick: (PickRow) -> Unit) {
+    /** 打开并定位到 currentUrl（该格当前频道）行；首次打开从右缘滑入（仿 EpgPanel.show）。
+     *  favOnly=true：频道列恒为全局收藏行（真机反馈③播放页右键收藏夹，分组列只留「收藏」一项）。 */
+    fun show(currentUrl: String?, showSubChips: Boolean = true, favOnly: Boolean = false, onPick: (PickRow) -> Unit) {
         pickCallback = onPick
+        this.showSubChips = showSubChips
+        this.favOnly = favOnly
         val first = !isOpen
         isOpen = true
         if (first) {
@@ -100,17 +107,26 @@ class ChannelDrawer(root: View, private val repo: Repository, private val scope:
     private fun load(currentUrl: String?) {
         scope.launch {
             val subs = repo.subscriptions()
-            if (subs.size > 1) { subRow.visibility = View.VISIBLE; buildSubChips(subs, currentUrl) } else subRow.visibility = View.GONE
+            if (showSubChips && subs.size > 1) { subRow.visibility = View.VISIBLE; buildSubChips(subs, currentUrl) } else subRow.visibility = View.GONE
+            val favs = repo.favorites()
+            favRows = favoritesToRows(favs)
+            if (favOnly) {   // 真机反馈③：收藏夹抽屉——全局收藏不依赖订阅（订阅可能已删，收藏仍应可播）
+                allRows = emptyList()
+                currentGroup = GROUP_FAV
+                title.text = if (favRows.isEmpty()) "收藏夹（首页按菜单键收藏频道）" else "收藏夹"
+                groupAdapter.submit(listOf<String?>(GROUP_FAV))
+                channelAdapter.submit(favRows)
+                focusRowAfterLayout(channelList, 0)
+                return@launch
+            }
             val sub = pickSubscription(subs, subId)
             if (sub == null) {   // 无订阅空态（Review Focus #6）
                 title.text = "暂无订阅：请到『订阅管理』添加"
-                allRows = emptyList(); favRows = emptyList()
+                allRows = emptyList()
                 groupAdapter.submit(emptyList()); channelAdapter.submit(emptyList())
                 return@launch
             }
-            val favs = repo.favorites()
             allRows = channelsToRows(repo.channels(sub.id), favs.map { it.dedupeKey }.toSet())
-            favRows = favoritesToRows(favs)
             title.text = "选择频道"
             currentGroup = null
             groupAdapter.submit(drawerGroups(repo.groups(sub.id), favs.size))
@@ -119,9 +135,7 @@ class ChannelDrawer(root: View, private val repo: Repository, private val scope:
             val idx = currentUrl?.let { u -> rows.indexOfFirst { it.url == u } } ?: -1
             val target = if (idx >= 0) maxOf(0, idx - 2) else 0
             if (idx >= 0) channelList.scrollToPosition(target)
-            channelList.post {
-                (channelList.layoutManager?.findViewByPosition(target) ?: channelList.getChildAt(0))?.requestFocus()
-            }
+            focusRowAfterLayout(channelList, target)  // post{} 早于布局会漏焦（真机反馈②）
         }
     }
 }

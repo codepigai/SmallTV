@@ -1,10 +1,17 @@
 <?xml version="1.0" encoding="utf-8"?>
+<!-- 订阅卡片（spec §④）：左两行=名称+meta（N 频道 · 刷新时间），右=状态徽标；选中高亮由 focus_bg 焦点态承担 -->
 <LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
     android:layout_width="match_parent" android:layout_height="wrap_content"
-    android:orientation="vertical" android:background="@drawable/focus_bg"
-    android:focusable="true" android:clickable="true" android:padding="14dp" android:layout_marginBottom="6dp">
-    <TextView android:id="@+id/subName" android:layout_width="match_parent" android:layout_height="wrap_content"
-        android:textSize="18sp" android:textColor="#FFFFFF" />
-    <TextView android:id="@+id/subMeta" android:layout_width="match_parent" android:layout_height="wrap_content"
-        android:textSize="13sp" android:textColor="#8899BB" />
+    android:orientation="horizontal" android:background="@drawable/focus_bg"
+    android:focusable="true" android:clickable="true" android:padding="14dp"
+    android:layout_marginBottom="14dp" android:gravity="center_vertical">
+    <LinearLayout android:layout_width="0dp" android:layout_height="wrap_content"
+        android:layout_weight="1" android:orientation="vertical">
+        <TextView android:id="@+id/subName" android:layout_width="match_parent" android:layout_height="wrap_content"
+            android:textSize="18sp" android:textColor="#FFFFFF" android:maxLines="1" android:ellipsize="end" />
+        <TextView android:id="@+id/subMeta" android:layout_width="match_parent" android:layout_height="wrap_content"
+            android:textSize="13sp" android:textColor="#8899BB" android:layout_marginTop="4dp" />
+    </LinearLayout>
+    <TextView android:id="@+id/subBadge" android:layout_width="wrap_content" android:layout_height="wrap_content"
+        android:textSize="12sp" android:layout_marginStart="12dp" />
 </LinearLayout>

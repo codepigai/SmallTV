@@ -26,6 +26,8 @@ class EpgPanel(root: View, private val repo: Repository, private val scope: Life
     private val adapter = EpgAdapter()
     var isOpen = false
         private set
+    /** 焦点是否已在面板行内：播放页 UP/DOWN 拦截据此放行（真机反馈②，空/未落焦面板不得做死换台键） */
+    val hasFocusInside: Boolean get() = list.hasFocus()
     private var name = ""
     private var tvgId: String? = null
 
@@ -65,9 +67,7 @@ class EpgPanel(root: View, private val repo: Repository, private val scope: Life
             val idx = rows.indexOfLast { it.startTime <= now }
             val target = if (idx >= 0) maxOf(0, idx - 2) else 0
             if (idx >= 0) list.scrollToPosition(target)
-            list.post {
-                (list.layoutManager?.findViewByPosition(target) ?: list.getChildAt(0))?.requestFocus()
-            }
+            focusRowAfterLayout(list, target)  // post{} 早于布局会漏焦（真机反馈②），见 ListFocus.kt
         }
     }
 

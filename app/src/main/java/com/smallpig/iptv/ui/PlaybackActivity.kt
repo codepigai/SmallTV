@@ -6,7 +6,6 @@ import android.os.Looper
 import android.view.KeyEvent
 import android.view.View
 import android.widget.TextView
-import android.widget.Toast
 import androidx.appcompat.app.AppCompatActivity
 import androidx.lifecycle.lifecycleScope
 import androidx.media3.common.MediaItem
@@ -40,10 +39,9 @@ class PlaybackActivity : AppCompatActivity() {
     private lateinit var playerView: PlayerView
     private lateinit var infoPanel: View
     private lateinit var nowBar: TextView
-    private lateinit var controls: View
     private lateinit var epgPanel: EpgPanel
+    private lateinit var drawer: ChannelDrawer
     private var infoShown = false
-    private var controlsShown = false
 
     private var chName: String = ""
     private var chUrl: String = ""
@@ -51,7 +49,6 @@ class PlaybackActivity : AppCompatActivity() {
     private var errListener: Player.Listener? = null
 
     private val handler = Handler(Looper.getMainLooper())
-    private val hideControls = Runnable { setControls(false) }
 
     private var barHasError = false
     private val hideBar = Runnable { nowBar.animate().alpha(0f).setDuration(800).start() }
@@ -87,12 +84,12 @@ class PlaybackActivity : AppCompatActivity() {
     private fun scheduleReconnect(errorName: String) {
         handler.removeCallbacks(reconnect)
         if (reconnects >= MAX_AUTO_RETRY) {
-            showErrorBar("$chName　播放失败：$errorName（已停止自动重连，按『下一台』切换或退出重进）")
+            showErrorBar("$chName　播放失败：$errorName（已停止自动重连，按『下键』换台或退出重进）")
             return
         }
         val delay = minOf(2000L * (1L shl reconnects.coerceAtMost(3).toInt()), 15_000L)
         reconnects++
-        showErrorBar("$chName　播放失败：$errorName（${delay / 1000}s 后第 $reconnects 次自动重连，『下一台』可切台）")
+        showErrorBar("$chName　播放失败：$errorName（${delay / 1000}s 后第 $reconnects 次自动重连，『下键』可换台）")
         handler.postDelayed(reconnect, delay)
     }
     private fun doReconnect() {
@@ -143,8 +140,8 @@ class PlaybackActivity : AppCompatActivity() {
         playerView = findViewById(R.id.playerView)
         infoPanel = findViewById(R.id.infoPanel)
         nowBar = findViewById(R.id.nowBar)
-        controls = findViewById(R.id.controls)
         epgPanel = EpgPanel(findViewById(android.R.id.content), repo, lifecycleScope)
+        drawer = ChannelDrawer(findViewById(android.R.id.content), repo, lifecycleScope)
         nowBar.text = chName; touchBar()
 
         // media3 1.x：直播时移与重试策略都挂在 MediaSource.Factory 上（ExoPlayer.Builder 无对应 setter）
@@ -171,14 +168,7 @@ class PlaybackActivity : AppCompatActivity() {
         player.prepare()
         player.playWhenReady = true
 
-        findViewById<TextView>(R.id.ctrlPrev).setOnClickListener { step(-1) }
-        findViewById<TextView>(R.id.ctrlNext).setOnClickListener { step(1) }
-        findViewById<TextView>(R.id.ctrlFav).setOnClickListener { toggleFav() }
-        findViewById<TextView>(R.id.ctrlEpg).setOnClickListener { epgPanel.show(chName, chTvgId) }
-        findViewById<TextView>(R.id.ctrlBack).setOnClickListener { finish() }
-
         loadEpg()
-        refreshFavLabel()
         saveLastChannel()
     }
 
@@ -193,10 +183,19 @@ class PlaybackActivity : AppCompatActivity() {
     override fun onKeyDown(keyCode: Int, event: KeyEvent?): Boolean {
         // BACK 不参与「按键重现信息条」，否则永远收不掉、退不出（真机反馈 #2）
         if (keyCode != KeyEvent.KEYCODE_BACK) touchBar()
+        // 键位重构（spec 2026-11-11-ui-batch §③）：UP/DOWN 换台。拦截条件=焦点确在面板内：
+        // 终审 I1（行在列表边界 focusSearch 落空会冒泡到此）由 hasFocusInside 覆盖；
+        // 真机反馈②：面板开着但焦点未落入（EPG 空/数据缺失）不得做死换台键——放行换台，restartWith 会刷新开着的面板
         when (keyCode) {
+            KeyEvent.KEYCODE_DPAD_UP, KeyEvent.KEYCODE_DPAD_DOWN -> {
+                if (drawer.hasFocusInside || epgPanel.hasFocusInside) return true
+                step(if (keyCode == KeyEvent.KEYCODE_DPAD_UP) -1 else 1); return true
+            }
             KeyEvent.KEYCODE_DPAD_CENTER, KeyEvent.KEYCODE_ENTER -> {
                 if (event?.repeatCount != 0) return true
-                setControls(!controlsShown); return true
+                if (epgPanel.isOpen) epgPanel.hide()
+                else { drawer.hide(); epgPanel.show(chName, chTvgId) }  // 面板互斥（裁决5）
+                return true
             }
             KeyEvent.KEYCODE_MENU -> {
                 if (event?.repeatCount != 0) return true
@@ -204,26 +203,28 @@ class PlaybackActivity : AppCompatActivity() {
                 if (infoShown) { updateInfo(); probeNet() }
                 return true
             }
-            KeyEvent.KEYCODE_DPAD_LEFT -> if (!controlsShown) { step(-1); return true }
-            KeyEvent.KEYCODE_DPAD_RIGHT -> if (!controlsShown) { step(1); return true }
+            KeyEvent.KEYCODE_DPAD_RIGHT -> {
+                if (drawer.isOpen) drawer.hide()
+                else {
+                    // 面板互斥（裁决5）；真机反馈③：右键=收藏夹抽屉（全局收藏；改判自 spec「当前订阅频道列表」）
+                    epgPanel.hide()
+                    drawer.show(chUrl, showSubChips = false, favOnly = true) { row ->
+                        drawer.hide()
+                        restartWith(row.name, row.url, row.tvgId)
+                    }
+                }
+                return true
+            }
+            KeyEvent.KEYCODE_DPAD_LEFT -> return true  // 无功能（用户确认吞掉，裁决4）
             KeyEvent.KEYCODE_BACK -> {
-                // 返回键逐层收起（真机反馈 #2/#5）：节目单面板 → 控制条/信息条 → 底部信息栏 → 退出
+                // 返回键逐层收起（Review Focus 2）：频道抽屉 → 节目单 → 信息面板 → nowBar → 退出
+                if (drawer.isOpen) { drawer.hide(); return true }
                 if (epgPanel.isOpen) { epgPanel.hide(); return true }
-                if (controlsShown || infoShown) { setControls(false); infoShown = false; infoPanel.visibility = View.GONE; return true }
+                if (infoShown) { infoShown = false; infoPanel.visibility = View.GONE; return true }
                 if (nowBar.alpha > 0f) { hideBarNow(); return true }
             }
         }
         return super.onKeyDown(keyCode, event)
-    }
-
-    private fun setControls(show: Boolean) {
-        controlsShown = show
-        controls.visibility = if (show) View.VISIBLE else View.GONE
-        handler.removeCallbacks(hideControls)
-        if (show) {
-            handler.postDelayed(hideControls, 5000)
-            findViewById<View>(R.id.ctrlNext).requestFocus()
-        } else playerView.requestFocus()
     }
 
     private fun step(dir: Int) {
@@ -243,11 +244,11 @@ class PlaybackActivity : AppCompatActivity() {
         lastRttMs = -1L
         barHasError = false; nowBar.text = name; touchBar()
         if (epgPanel.isOpen) epgPanel.show(name, tvgId)  // 面板开着时切台：标题与内容跟随新频道
+        if (drawer.isOpen) drawer.hide()  // 换台路径均先收抽屉（终审 I1：兑现注释，不留旧列表的抽屉在屏上）
         attachErrorListener()
         player.setMediaItem(MediaItem.fromUri(url))
         player.prepare(); player.playWhenReady = true
         loadEpg()
-        refreshFavLabel()
         saveLastChannel()
     }
 
@@ -268,24 +269,9 @@ class PlaybackActivity : AppCompatActivity() {
         player.addListener(l)
     }
 
-    private fun refreshFavLabel() {
-        lifecycleScope.launch {
-            findViewById<TextView>(R.id.ctrlFav).text =
-                if (repo.isFavorited(chName, chUrl)) "已收藏" else "收藏"
-        }
-    }
-
     private fun saveLastChannel() {
         lifecycleScope.launch {
             repo.saveState(LAST_CHANNEL_KEY, "$chName|$chUrl|${chTvgId ?: ""}")
-        }
-    }
-
-    private fun toggleFav() {
-        lifecycleScope.launch {
-            val nowFav = repo.toggleFavorite(chName, null, chUrl)
-            findViewById<TextView>(R.id.ctrlFav).text = if (nowFav) "已收藏" else "收藏"
-            Toast.makeText(this@PlaybackActivity, if (nowFav) "已收藏" else "已取消收藏", Toast.LENGTH_SHORT).show()
         }
     }
 

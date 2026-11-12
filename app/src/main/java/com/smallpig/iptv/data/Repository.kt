@@ -53,6 +53,8 @@ class Repository(private val db: AppDatabase, private val fetcher: Fetcher) {
             Channel(subscriptionId = subId, name = it.name, logoUrl = it.logo,
                 groupTitle = it.group, streamUrl = it.url, tvgId = it.tvgId, sortIndex = it.order)
         })
+        // 拉取成功即写刷新时刻：手动刷新/新增保存/编辑保存三处调用全走这里（spec §④裁决7）
+        subs.touch(subId, System.currentTimeMillis())
         parsed.size
     }
 
