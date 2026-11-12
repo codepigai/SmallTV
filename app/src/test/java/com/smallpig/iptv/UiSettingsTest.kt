@@ -2,6 +2,7 @@ package com.smallpig.iptv
 
 import com.smallpig.iptv.ui.MODE_GRID
 import com.smallpig.iptv.ui.MODE_LIST
+import com.smallpig.iptv.ui.channelItemViewType
 import com.smallpig.iptv.ui.needsLayoutRebuild
 import com.smallpig.iptv.ui.nextMode
 import com.smallpig.iptv.ui.nextSpan
@@ -74,5 +75,13 @@ class UiSettingsTest {
     fun needsLayoutRebuild_spanOnlyMattersInGridMode() {
         assertEquals(true, needsLayoutRebuild(Pair(true, 3), true, 4))   // 宫格换路数→重建
         assertEquals(false, needsLayoutRebuild(Pair(false, 3), false, 4)) // 列表态调路数→不重建
+    }
+
+    // ---- 真机反馈①：画廊切回列表混用卡片——RecycledViewPool 按 viewType 回收，两模式若同 viewType，
+    // 另一模式的 holder 会被原样复用（item 视图不换布局）。两模式必须分属不同 viewType ----
+    @Test
+    fun channelItemViewType_gridAndListDistinct() {
+        assertEquals(0, channelItemViewType(false)) // 列表=默认 0：同 RecyclerView 的其他 adapter（收藏列表恒列表）不受牵连
+        assertEquals(1, channelItemViewType(true))  // 画廊=1：池隔离，永不把宫格卡给列表
     }
 }

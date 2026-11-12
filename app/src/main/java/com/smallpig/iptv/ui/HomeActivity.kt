@@ -254,6 +254,10 @@ private class GroupAdapter(val onClick: (String?) -> Unit) : RecyclerView.Adapte
     }
 }
 
+/** 真机反馈①：RecycledViewPool 按 viewType 回收 holder，画廊/列表若同 viewType，
+ *  切模式后另一模式的卡会被原样复用（item 视图不换布局）→ 必须分属不同 viewType（列表保持 0，收藏等不受牵连） */
+fun channelItemViewType(grid: Boolean): Int = if (grid) 1 else 0
+
 private class ChannelAdapter(
     val onClick: (Channel) -> Unit,
     val onLongClick: (Channel) -> Unit,
@@ -279,9 +283,10 @@ private class ChannelAdapter(
         val now: TextView = v.findViewById(R.id.chNow)
         val fav: TextView = v.findViewById(R.id.chFav)
     }
+    override fun getItemViewType(position: Int) = channelItemViewType(grid)
     override fun onCreateViewHolder(parent: ViewGroup, viewType: Int) =
         VH(LayoutInflater.from(parent.context).inflate(
-            if (grid) R.layout.item_channel_grid else R.layout.item_channel, parent, false))
+            if (viewType == 1) R.layout.item_channel_grid else R.layout.item_channel, parent, false))
     override fun getItemCount() = items.size
     override fun onBindViewHolder(h: VH, pos: Int) {
         val c = items[pos]
