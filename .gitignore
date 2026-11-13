@@ -10,3 +10,8 @@ local.properties
 # release 签名凭据，勿入库（备份说明见 docs/RELEASE.md）
 keystore/
 keystore.properties
+# 构建产物不入库（发版走 Gitea Release 附件）
+*.apk
+# 根目录字体下载原稿不入库（实际打包用 app/src/main/res/font/source_han_sans_sc.otf）
+/GenJyuuGothic-Normal-2.ttf
+/Source_Han_Sans_SC_Medium_Medium.otf
