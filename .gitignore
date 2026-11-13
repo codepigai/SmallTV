@@ -15,3 +15,8 @@ keystore.properties
 # 根目录字体下载原稿不入库（实际打包用 app/src/main/res/font/source_han_sans_sc.otf）
 /GenJyuuGothic-Normal-2.ttf
 /Source_Han_Sans_SC_Medium_Medium.otf
+# 本地素材与工具配置，不入库
+/SmallTV-logo.jpg
+/config.png
+/iptv/
+/.claude/
